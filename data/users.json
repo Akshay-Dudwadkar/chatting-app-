@@ -8,5 +8,10 @@
     "username": "rasika",
     "password": "akshay134",
     "isOwner": false
+  },
+  {
+    "username": "akshay",
+    "password": "akshay123",
+    "isOwner": false
   }
 ]

@@ -2,6 +2,30 @@
   "chats": {
     "alice": [],
     "rasika": [],
-    "bob": []
+    "bob": [],
+    "akshay": [
+      {
+        "id": "0f9e23eb-577c-4b7b-b90c-ffb04787bbc1",
+        "from": "owner",
+        "type": "text",
+        "text": "hhi",
+        "url": null,
+        "filename": null,
+        "mime": null,
+        "timestamp": "2026-04-09T17:26:22.532Z",
+        "unread": false
+      },
+      {
+        "id": "e960b46d-1ba9-4630-9746-9c40a81f9451",
+        "from": "akshay",
+        "type": "text",
+        "text": "cd",
+        "url": null,
+        "filename": null,
+        "mime": null,
+        "timestamp": "2026-04-09T17:26:46.367Z",
+        "unread": false
+      }
+    ]
   }
 }

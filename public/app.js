@@ -716,33 +716,41 @@ voiceRecordBtn.addEventListener('click', () => {
   resetInactivityTimer();
 });
 
-createUserForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  event.stopPropagation();
-  const username = document.getElementById('new-username').value.trim();
-  const password = document.getElementById('new-password').value.trim();
-  if (!username || !password) {
-    alert('Please enter both username and password');
-    return;
-  }
-  try {
-    console.log('Creating user:', username);
-    const response = await api('/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    console.log('User created successfully:', response);
-    hideElement(createUserModal);
-    createUserForm.reset();
-    await renderSidebar();
-    await loadUsers();
-    alert('User created successfully!');
-  } catch (error) {
-    console.error('Failed to create user:', error);
-    alert('Failed to create user: ' + error.message);
-  }
-});
+if (createUserForm) {
+  createUserForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    console.log('Create User form submitted');
+    const username = document.getElementById('new-username').value.trim();
+    const password = document.getElementById('new-password').value.trim();
+    console.log('Username:', username, 'Password length:', password.length);
+    
+    if (!username || !password) {
+      alert('Please enter both username and password');
+      return;
+    }
+    
+    try {
+      console.log('Sending POST request to /users with username:', username);
+      const response = await api('/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      console.log('User created successfully:', response);
+      hideElement(createUserModal);
+      createUserForm.reset();
+      await renderSidebar();
+      await loadUsers();
+      alert('User created successfully!');
+    } catch (error) {
+      console.error('Failed to create user:', error);
+      alert('Failed to create user: ' + error.message);
+    }
+  });
+} else {
+  console.warn('Create User form not found');
+}
 
 changePasswordBtn.addEventListener('click', (event) => {
   event.preventDefault();
@@ -766,6 +774,14 @@ closeActionsBtn.addEventListener('click', () => hideElement(userActionsModal));
 cancelChangeBtn.addEventListener('click', () => hideElement(changePasswordModal));
 changePasswordForm.addEventListener('submit', changePassword);
 
+const stopTyping = () => {
+  if (isTyping && socket) {
+    socket.emit('stopTyping');
+    isTyping = false;
+  }
+  if (typingTimer) clearTimeout(typingTimer);
+};
+
 messageInput.addEventListener('input', () => {
   if (!socket || !selectedPartner) return;
   if (!isTyping) {
@@ -777,14 +793,6 @@ messageInput.addEventListener('input', () => {
 });
 
 messageInput.addEventListener('blur', stopTyping);
-
-const stopTyping = () => {
-  if (isTyping && socket) {
-    socket.emit('stopTyping');
-    isTyping = false;
-  }
-  if (typingTimer) clearTimeout(typingTimer);
-};
 
 const toggleDarkMode = () => {
   isDarkMode = !isDarkMode;
