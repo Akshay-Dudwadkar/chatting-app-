@@ -1,0 +1,18 @@
+{
+  "name": "simple-chat-app",
+  "version": "1.0.0",
+  "description": "Simple owner-managed chat website with file upload and voice call support.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-session": "^1.17.4",
+    "mongodb": "^4.17.2",
+    "socket.io": "^4.7.2",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^9.0.0"
+  }
+}

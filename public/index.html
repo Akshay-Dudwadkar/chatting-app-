@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Chat App - WhatsApp Style</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <div id="login-screen" class="panel">
+      <h1>Chat Login</h1>
+      <form id="login-form">
+        <label>Username</label>
+        <input type="text" id="login-username" autocomplete="username" required />
+        <label>Password</label>
+        <input type="password" id="login-password" autocomplete="current-password" required />
+        <button type="submit">Login</button>
+        <p class="hint">Owner can log in with <strong>owner / owner123</strong></p>
+      </form>
+      <div id="login-error" class="error"></div>
+    </div>
+
+    <div id="chat-app" class="panel hidden">
+      <div class="chat-layout">
+        <aside id="sidebar" class="sidebar">
+          <div class="sidebar-header">
+            <h2 id="sidebar-title">Owner Dashboard</h2>
+            <div class="sidebar-controls">
+              <div class="owner-controls">
+                <button type="button" id="create-user-btn" class="sidebar-btn" title="Create User">👤 Create</button>
+                <button type="button" id="manage-users-btn" class="sidebar-btn" title="Manage Users">⚙️ Manage</button>
+              </div>
+              <button type="button" id="dark-mode-btn" class="sidebar-btn" title="Dark Mode">
+                <span id="dark-mode-icon">🌙</span>
+              </button>
+              <button type="button" id="logout-btn" class="sidebar-btn logout" title="Logout">🚪</button>
+            </div>
+          </div>
+          <div class="owner-info">
+            <div class="owner-avatar">
+              <span>O</span>
+            </div>
+            <div class="owner-details">
+              <h3>Owner</h3>
+              <p>Administrator</p>
+            </div>
+          </div>
+          <div class="user-section">
+            <h3>Active Users</h3>
+            <div id="user-list" class="user-list"></div>
+          </div>
+        </aside>
+
+        <main class="chat-area">
+          <div id="chat-header" class="chat-header">
+            <div class="chat-info">
+              <div class="avatar" id="chat-avatar">
+                <span id="chat-avatar-letter"></span>
+              </div>
+              <div>
+                <h3 id="chat-partner-name">Select a user to start chatting</h3>
+                <span id="chat-status">Click on a user from the sidebar</span>
+              </div>
+            </div>
+            <div class="chat-actions">
+              <button type="button" id="search-btn" class="action-btn" title="Search Messages">🔍</button>
+              <button type="button" id="call-btn" class="action-btn" title="Voice Call">📞</button>
+              <button type="button" id="more-btn" class="action-btn" title="More Options">⋯</button>
+            </div>
+          </div>
+
+          <div id="message-search" class="message-search hidden">
+            <input type="text" id="search-input" class="search-input" placeholder="Search messages..." />
+            <div id="search-results" class="search-results hidden"></div>
+          </div>
+
+          <div id="pinned-messages" class="pinned-messages hidden"></div>
+
+          <div id="messages" class="messages">
+            <div class="welcome-message">
+              <div class="welcome-icon">💬</div>
+              <h2>Welcome to Chat App</h2>
+              <p>Select a user from the sidebar to start a conversation</p>
+            </div>
+          </div>
+
+          <div class="message-input-area">
+            <form id="message-form" class="message-form">
+              <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off" />
+              <label class="file-upload" title="Attach file">
+                <input type="file" id="file-input" />
+                📎
+              </label>
+              <button type="button" id="voice-record-btn" class="voice-record-btn" title="Record voice message">
+                🎤
+              </button>
+              <button type="submit" class="send-btn" id="send-btn">Send</button>
+            </form>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="create-user-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Create New User</h3>
+        <form id="create-user-form" class="modal-form">
+          <input type="text" id="new-username" placeholder="Username" required />
+          <input type="password" id="new-password" placeholder="Password" required />
+          <div class="form-buttons">
+            <button type="submit">Create</button>
+            <button type="button" id="cancel-create">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="manage-users-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Manage Users</h3>
+        <div id="manage-user-list"></div>
+        <button type="button" id="close-manage">Close</button>
+      </div>
+    </div>
+
+    <div id="user-actions-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Actions for <span id="action-username"></span></h3>
+        <button type="button" id="change-password-btn">Change Password</button>
+        <button type="button" id="delete-chat-btn" class="danger">Delete Chat</button>
+        <button type="button" id="close-actions">Cancel</button>
+      </div>
+    </div>
+
+    <div id="change-password-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Change Password for <span id="change-username"></span></h3>
+        <form id="change-password-form" class="modal-form">
+          <input type="password" id="change-password-input" placeholder="New Password" required />
+          <div class="form-buttons">
+            <button type="submit">Update</button>
+            <button type="button" id="cancel-change">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
