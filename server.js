@@ -15,7 +15,7 @@ const io = new Server(server);
 
 const MONGO_URI = process.env.MONGO_URI || '';
 const MONGO_DB_NAME = process.env.MONGO_DB_NAME || 'chatapp';
-const useMongo = Boolean(MONGO_URI);
+let useMongo = Boolean(MONGO_URI);
 let mongoClient = null;
 let usersCollection = null;
 let chatsCollection = null;
@@ -501,8 +501,8 @@ const startServer = async () => {
       await initMongoDb();
       console.log('Connected to MongoDB');
     } catch (error) {
-      console.error('Failed to connect to MongoDB:', error);
-      process.exit(1);
+      console.error('MongoDB connection failed, falling back to JSON storage:', error.message);
+      useMongo = false;
     }
   }
 
