@@ -1,29 +1,61 @@
 {
   "chats": {
     "alice": [],
-    "rasika": [],
-    "bob": [],
-    "akshay": [
+    "rasika": [
       {
-        "id": "0f9e23eb-577c-4b7b-b90c-ffb04787bbc1",
+        "id": "304b546f-fe92-4fbb-b224-181d2a5106ce",
         "from": "owner",
         "type": "text",
-        "text": "hhi",
+        "text": "jjjjjjjjjjjjj",
         "url": null,
         "filename": null,
         "mime": null,
-        "timestamp": "2026-04-09T17:26:22.532Z",
+        "timestamp": "2026-04-09T17:56:42.607Z",
         "unread": false
       },
       {
-        "id": "e960b46d-1ba9-4630-9746-9c40a81f9451",
-        "from": "akshay",
+        "id": "1fc3cadd-7849-4995-89c5-84eead6f78cc",
+        "from": "owner",
         "type": "text",
-        "text": "cd",
+        "text": "mbbbk",
         "url": null,
         "filename": null,
         "mime": null,
-        "timestamp": "2026-04-09T17:26:46.367Z",
+        "timestamp": "2026-04-09T17:57:52.994Z",
+        "unread": false
+      },
+      {
+        "id": "68ed7e5b-44ce-49bb-91e5-90cee7d62d89",
+        "from": "rasika",
+        "type": "text",
+        "text": "kjlln'knkl'",
+        "url": null,
+        "filename": null,
+        "mime": null,
+        "timestamp": "2026-04-09T17:58:21.814Z",
+        "unread": true
+      }
+    ],
+    "bob": [],
+    "akshay": [],
+    "akshay21": [
+      {
+        "id": "63726a5a-84b7-473d-837f-0c5da1280433",
+        "from": "owner",
+        "type": "text",
+        "text": "uuu",
+        "url": null,
+        "filename": null,
+        "mime": null,
+        "timestamp": "2026-04-09T17:54:34.972Z",
+        "unread": true
+      },
+      {
+        "id": "d2b77d87-4594-4162-be85-29d3d92d6adb",
+        "from": "owner",
+        "type": "deleted",
+        "text": "Message was deleted",
+        "timestamp": "2026-04-09T17:54:49.023Z",
         "unread": false
       }
     ]

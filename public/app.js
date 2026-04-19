@@ -37,11 +37,26 @@ const searchInput = document.getElementById('search-input');
 const searchResults = document.getElementById('search-results');
 const pinnedMessages = document.getElementById('pinned-messages');
 // Sidebar control buttons
-const createUserBtn = document.getElementById('create-user-btn');
-const manageUsersBtn = document.getElementById('manage-users-btn');
-const darkModeBtn = document.getElementById('dark-mode-btn');
+const menuBtn = document.getElementById('menu-btn');
+const menuDropdown = document.getElementById('menu-dropdown');
+const createUserBtn = document.getElementById('create-user-menu-btn');
+const manageUsersBtn = document.getElementById('manage-users-menu-btn');
+const darkModeBtn = document.getElementById('dark-mode-menu-btn');
 const darkModeIcon = document.getElementById('dark-mode-icon');
-const logoutBtn = document.getElementById('logout-btn');
+const logoutBtn = document.getElementById('logout-menu-btn');
+
+if (menuBtn && menuDropdown) {
+  menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    menuDropdown.classList.toggle('hidden');
+  });
+  
+  document.addEventListener('click', (e) => {
+    if (!menuBtn.contains(e.target) && !menuDropdown.contains(e.target)) {
+      menuDropdown.classList.add('hidden');
+    }
+  });
+}
 
 let currentUser = null;
 let selectedPartner = null;
@@ -890,7 +905,7 @@ window.addEventListener('beforeunload', () => {
 if (createUserBtn) {
   createUserBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    console.log('Create User button clicked');
+    if (menuDropdown) menuDropdown.classList.add('hidden');
     showElement(createUserModal);
   });
 } else {
@@ -899,6 +914,7 @@ if (createUserBtn) {
 if (manageUsersBtn) {
   manageUsersBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (menuDropdown) menuDropdown.classList.add('hidden');
     showElement(manageUsersModal);
     loadUsers();
   });
@@ -906,7 +922,7 @@ if (manageUsersBtn) {
 if (darkModeBtn) {
   darkModeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    console.log('Dark Mode button clicked');
+    if (menuDropdown) menuDropdown.classList.add('hidden');
     toggleDarkMode();
   });
 } else {

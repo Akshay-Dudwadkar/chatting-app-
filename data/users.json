@@ -13,5 +13,10 @@
     "username": "akshay",
     "password": "akshay123",
     "isOwner": false
+  },
+  {
+    "username": "akshay21",
+    "password": "akshay123",
+    "isOwner": false
   }
 ]
