@@ -422,14 +422,22 @@ app.delete('/chat/:username/message/:messageId', requireAuth, async (req, res) =
     return res.json({ success: true });
   }
 
-  // Non-owner deletion: always perform a "delete for me" (including when asking forEveryone)
-  // We implement this by recording that this message is hidden from this username.
+  // Non-owner 'delete for everyone': remove the message from this user's chat entirely
+  if (forEveryone) {
+    chat.splice(messageIndex, 1);
+    await saveChatForUser(chatOwner, chat);
+    const target = onlineUsers.get(current.username);
+    if (target && target.socketId) {
+      io.to(target.socketId).emit('messageDeleted', { messageId, global: false });
+    }
+    return res.json({ success: true });
+  }
+
+  // Non-owner normal delete: hide locally by marking hiddenFrom
   if (!original.hiddenFrom) original.hiddenFrom = [];
   if (!original.hiddenFrom.includes(current.username)) original.hiddenFrom.push(current.username);
   chat[messageIndex] = original;
   await saveChatForUser(chatOwner, chat);
-
-  // Notify only the deleting user's socket(s) so owner is NOT informed
   const target = onlineUsers.get(current.username);
   if (target && target.socketId) {
     io.to(target.socketId).emit('messageDeleted', { messageId, global: false });

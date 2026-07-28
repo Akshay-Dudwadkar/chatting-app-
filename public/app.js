@@ -182,7 +182,7 @@ const showMessageContextMenu = (x, y, message, messageDiv) => {
   delBtn.addEventListener('click', async () => { if (confirm('Delete this message?')) await deleteMessage(message.id, false); menu.remove(); });
   const delEveryoneBtn = document.createElement('button'); delEveryoneBtn.textContent = 'Delete for Everyone';
   delEveryoneBtn.addEventListener('click', async () => {
-    if (!confirm('Delete for everyone? (Note: as a regular user this will only remove the message from your view)')) return;
+    if (!confirm('Delete this message for everyone?')) return;
     await deleteMessage(message.id, true);
     menu.remove();
   });

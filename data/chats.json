@@ -102,7 +102,35 @@
         "filename": null,
         "mime": null,
         "timestamp": "2026-07-28T08:21:49.700Z",
-        "unread": true
+        "unread": false
+      },
+      {
+        "id": "900b138f-a87d-47cc-98f8-d08f3b38f773",
+        "from": "Rasika",
+        "type": "text",
+        "text": "hii",
+        "url": null,
+        "filename": null,
+        "mime": null,
+        "timestamp": "2026-07-28T08:58:55.028Z",
+        "unread": true,
+        "hiddenFrom": [
+          "Rasika"
+        ]
+      },
+      {
+        "id": "54c3673f-7989-42be-901f-e7ec1652d8b7",
+        "from": "Rasika",
+        "type": "text",
+        "text": "ji",
+        "url": null,
+        "filename": null,
+        "mime": null,
+        "timestamp": "2026-07-28T09:01:03.062Z",
+        "unread": true,
+        "hiddenFrom": [
+          "Rasika"
+        ]
       }
     ]
   }
