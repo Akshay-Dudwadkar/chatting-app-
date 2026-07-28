@@ -58,6 +58,52 @@
         "timestamp": "2026-04-09T17:54:49.023Z",
         "unread": false
       }
+    ],
+    "Rasika": [
+      {
+        "id": "e5c91919-6036-4c25-ba36-b78c8635eb87",
+        "from": "owner",
+        "type": "text",
+        "text": "hey",
+        "url": null,
+        "filename": null,
+        "mime": null,
+        "timestamp": "2026-07-28T07:55:17.579Z",
+        "unread": false
+      },
+      {
+        "id": "1095ca99-5700-4a76-8002-527e13417bce",
+        "from": "Rasika",
+        "type": "deleted",
+        "text": "Message was deleted",
+        "url": null,
+        "filename": null,
+        "mime": null,
+        "timestamp": "2026-07-28T07:56:54.015Z",
+        "unread": false
+      },
+      {
+        "id": "136300c1-9686-44e4-8da3-f6b1d4d2bd02",
+        "from": "Rasika",
+        "type": "deleted",
+        "text": "Message was deleted",
+        "url": null,
+        "filename": null,
+        "mime": null,
+        "timestamp": "2026-07-28T07:59:44.524Z",
+        "unread": false
+      },
+      {
+        "id": "23232ba3-3113-4e6a-96fd-b34788d6c48e",
+        "from": "owner",
+        "type": "text",
+        "text": "hiiii",
+        "url": null,
+        "filename": null,
+        "mime": null,
+        "timestamp": "2026-07-28T08:21:49.700Z",
+        "unread": true
+      }
     ]
   }
 }

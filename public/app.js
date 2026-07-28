@@ -27,6 +27,7 @@ const actionUsername = document.getElementById('action-username');
 const changeUsername = document.getElementById('change-username');
 const changePasswordBtn = document.getElementById('change-password-btn');
 const deleteChatBtn = document.getElementById('delete-chat-btn');
+const deleteUserBtn = document.getElementById('delete-user-btn');
 const cancelCreateBtn = document.getElementById('cancel-create');
 const closeManageBtn = document.getElementById('close-manage');
 const closeActionsBtn = document.getElementById('close-actions');
@@ -36,6 +37,10 @@ const messageSearch = document.getElementById('message-search');
 const searchInput = document.getElementById('search-input');
 const searchResults = document.getElementById('search-results');
 const pinnedMessages = document.getElementById('pinned-messages');
+const backToListBtn = document.getElementById('back-to-list-btn');
+const replyPreview = document.getElementById('reply-preview');
+const filePreview = document.getElementById('file-preview');
+const emojiBtn = document.getElementById('emoji-btn');
 // Sidebar control buttons
 const menuBtn = document.getElementById('menu-btn');
 const menuDropdown = document.getElementById('menu-dropdown');
@@ -44,6 +49,7 @@ const manageUsersBtn = document.getElementById('manage-users-menu-btn');
 const darkModeBtn = document.getElementById('dark-mode-menu-btn');
 const darkModeIcon = document.getElementById('dark-mode-icon');
 const logoutBtn = document.getElementById('logout-menu-btn');
+const waModeBtn = document.getElementById('wa-mode-menu-btn');
 
 if (menuBtn && menuDropdown) {
   menuBtn.addEventListener('click', (e) => {
@@ -58,6 +64,56 @@ if (menuBtn && menuDropdown) {
   });
 }
 
+// WhatsApp-like mode toggle
+const applyWAMode = (on) => {
+  if (on) document.body.classList.add('wa-theme');
+  else document.body.classList.remove('wa-theme');
+  try { localStorage.setItem('waTheme', on ? '1' : '0'); } catch (e) {}
+};
+
+if (waModeBtn) {
+  waModeBtn.addEventListener('click', () => {
+    const isOn = document.body.classList.toggle('wa-theme');
+    // reflect in menu (small visual feedback)
+    waModeBtn.classList.toggle('menu-item--active', isOn);
+    try { localStorage.setItem('waTheme', isOn ? '1' : '0'); } catch (e) {}
+  });
+  // initialize from localStorage
+  try {
+    const pref = localStorage.getItem('waTheme');
+    if (pref === '1') applyWAMode(true);
+  } catch (e) {}
+}
+
+// Emoji picker
+const openEmojiPicker = (anchorEl) => {
+  if (emojiPickerEl) { emojiPickerEl.remove(); emojiPickerEl = null; return; }
+  const emojis = ['😀','😂','😊','😍','👍','🙏','🎉','😮','😢','🔥','✨','🤝'];
+  const picker = document.createElement('div');
+  picker.className = 'emoji-picker';
+  emojis.forEach((e) => {
+    const b = document.createElement('button'); b.textContent = e;
+    b.addEventListener('click', () => {
+      messageInput.value = (messageInput.value + ' ' + e).trim();
+      messageInput.focus();
+      picker.remove(); emojiPickerEl = null;
+    });
+    picker.appendChild(b);
+  });
+  document.body.appendChild(picker);
+  emojiPickerEl = picker;
+  const rect = anchorEl.getBoundingClientRect();
+  picker.style.right = (window.innerWidth - rect.right) + 'px';
+  picker.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+};
+
+if (emojiBtn) {
+  emojiBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openEmojiPicker(emojiBtn);
+  });
+}
+
 let currentUser = null;
 let selectedPartner = null;
 let socket = null;
@@ -68,6 +124,74 @@ let typingTimer = null;
 let isTyping = false;
 let isDarkMode = false;
 let pinnedMessageIds = new Set();
+let replyTo = null;
+let pendingFile = null;
+let emojiPickerEl = null;
+
+const insertDateSeparatorIfNeeded = (timestamp) => {
+  try {
+    const date = new Date(timestamp);
+    const dateKey = date.toDateString();
+    const lastSep = messagesContainer.querySelector('.date-separator:last-of-type span');
+    const lastKey = lastSep ? lastSep.dataset.dateKey : null;
+    if (lastKey !== dateKey) {
+      const sep = document.createElement('div');
+      sep.className = 'date-separator';
+      const span = document.createElement('span');
+      span.textContent = dateKey;
+      span.dataset.dateKey = dateKey;
+      sep.appendChild(span);
+      messagesContainer.appendChild(sep);
+    }
+  } catch (e) { /* ignore */ }
+};
+
+const showReplyPreview = (message) => {
+  if (!replyPreview) return;
+  replyPreview.innerHTML = ` <div class="reply-text">Replying to <strong>${message.from}</strong>: ${String(message.text || message.filename || '')}</div><button class="reply-cancel">✕</button>`;
+  replyPreview.querySelector('.reply-cancel').addEventListener('click', () => {
+    replyTo = null;
+    hideElement(replyPreview);
+  });
+  showElement(replyPreview);
+};
+
+const clearReplyPreview = () => {
+  replyTo = null;
+  if (replyPreview) replyPreview.innerHTML = '';
+  hideElement(replyPreview);
+};
+
+const showMessageContextMenu = (x, y, message, messageDiv) => {
+  // remove existing
+  document.querySelectorAll('.message-context-menu').forEach((el) => el.remove());
+  const menu = document.createElement('div');
+  menu.className = 'message-context-menu';
+  const copyBtn = document.createElement('button'); copyBtn.textContent = 'Copy';
+  copyBtn.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(message.text || message.filename || ''); } catch (e) {}
+    menu.remove();
+  });
+  const replyBtn = document.createElement('button'); replyBtn.textContent = 'Reply';
+  replyBtn.addEventListener('click', () => {
+    replyTo = message; showReplyPreview(message); menu.remove();
+  });
+  const starBtn = document.createElement('button'); starBtn.textContent = pinnedMessageIds.has(message.id) ? 'Unstar' : 'Star';
+  starBtn.addEventListener('click', () => { togglePinMessage(message.id); menu.remove(); });
+  const delBtn = document.createElement('button'); delBtn.textContent = 'Delete';
+  delBtn.addEventListener('click', async () => { if (confirm('Delete this message?')) await deleteMessage(message.id, false); menu.remove(); });
+  const delEveryoneBtn = document.createElement('button'); delEveryoneBtn.textContent = 'Delete for Everyone';
+  delEveryoneBtn.addEventListener('click', async () => {
+    if (!confirm('Delete for everyone? (Note: as a regular user this will only remove the message from your view)')) return;
+    await deleteMessage(message.id, true);
+    menu.remove();
+  });
+  menu.appendChild(copyBtn); menu.appendChild(replyBtn); menu.appendChild(starBtn); menu.appendChild(delBtn); menu.appendChild(delEveryoneBtn);
+  document.body.appendChild(menu);
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+  document.addEventListener('click', () => menu.remove(), { once: true });
+};
 
 const api = async (path, options = {}) => {
   const response = await fetch(path, { credentials: 'same-origin', ...options });
@@ -125,14 +249,18 @@ const showChatApp = () => {
     sidebarTitle.textContent = 'Owner Dashboard';
     showElement(ownerInfo);
     showElement(ownerControls);
+    document.body.classList.add('owner-mode');
   } else {
     sidebarTitle.textContent = 'Chat with Owner';
     hideElement(ownerInfo);
     hideElement(ownerControls);
+    document.body.classList.remove('owner-mode');
   }
 
   renderSidebar();
   resetInactivityTimer();
+  // Ensure socket connection exists for owner (so server can push unread summaries/messages)
+  if (currentUser) connectSocket();
 };
 
 const setActiveSidebarItem = () => {
@@ -206,6 +334,14 @@ const renderSidebar = async () => {
         });
         userList.appendChild(item);
       });
+      // Auto-open first unread conversation for owner (so messages sent while owner was offline are visible)
+      if (!selectedPartner) {
+        const firstUnread = data.partners.find(p => p.unreadCount && p.unreadCount > 0);
+        if (firstUnread) {
+          // small delay to ensure UI is ready
+          setTimeout(() => selectPartner(firstUnread.username), 120);
+        }
+      }
     } else {
       const partner = data.partners[0];
       const item = createSidebarItem({
@@ -236,9 +372,51 @@ const selectPartner = async (username) => {
   messagesContainer.innerHTML = '';
   await loadChat(username);
   connectSocket();
+  // If on narrow screens, open chat as a full page (hide sidebar)
+  const layout = document.querySelector('.chat-layout');
+  if (layout && window.innerWidth <= 1024) {
+    layout.classList.add('conversation-full');
+    if (backToListBtn) backToListBtn.classList.remove('hidden');
+  }
 };
 
+if (backToListBtn) {
+  backToListBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    const layout = document.querySelector('.chat-layout');
+    if (layout) layout.classList.remove('conversation-full');
+    hideElement(chatMain);
+    // keep selectedPartner but show sidebar for selection
+    setActiveSidebarItem();
+    backToListBtn.classList.add('hidden');
+  });
+}
+
+// Keep layout responsive: when resizing, ensure mobile widths show full-chat if a partner is selected
+const adjustLayoutForWidth = () => {
+  const layout = document.querySelector('.chat-layout');
+  if (!layout) return;
+  if (window.innerWidth <= 1024 && selectedPartner) {
+    layout.classList.add('conversation-full');
+    if (backToListBtn) backToListBtn.classList.remove('hidden');
+    showElement(chatMain);
+  } else {
+    layout.classList.remove('conversation-full');
+    if (backToListBtn) backToListBtn.classList.add('hidden');
+    // on wider screens keep chat area visible
+    if (selectedPartner) showElement(chatMain);
+  }
+};
+
+window.addEventListener('resize', adjustLayoutForWidth);
+// run once at startup
+setTimeout(adjustLayoutForWidth, 50);
+
 const renderMessage = (message) => {
+  // avoid rendering duplicates and respect per-user hidden flags
+  if (!message || !message.id) return;
+  if (message.hiddenFrom && currentUser && message.hiddenFrom.includes(currentUser.username)) return;
+  if (messagesContainer.querySelector(`[data-message-id="${message.id}"]`)) return;
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${message.from === currentUser.username ? 'sent' : 'received'}`;
   messageDiv.dataset.messageId = message.id;
@@ -277,7 +455,7 @@ const renderMessage = (message) => {
     deleteButton.textContent = '🗑️';
     deleteButton.addEventListener('click', async () => {
       if (!confirm('Delete this message?')) return;
-      await deleteMessage(message.id);
+        await deleteMessage(message.id, false);
     });
     bubble.appendChild(deleteButton);
 
@@ -294,6 +472,15 @@ const renderMessage = (message) => {
     reactionButton.textContent = '😊';
     reactionButton.addEventListener('click', () => showReactionPicker(message.id));
     bubble.appendChild(reactionButton);
+    const replyButton = document.createElement('button');
+    replyButton.className = 'message-reply-btn';
+    replyButton.title = 'Reply';
+    replyButton.textContent = '↩️';
+    replyButton.addEventListener('click', () => {
+      replyTo = message;
+      showReplyPreview(message);
+    });
+    bubble.appendChild(replyButton);
   }
 
   const reactionsDiv = document.createElement('div');
@@ -311,11 +498,32 @@ const renderMessage = (message) => {
   const time = document.createElement('div');
   time.className = 'message-time';
   time.textContent = formatTime(message.timestamp);
+  // delivery/read status for sent messages
+  if (message.from === currentUser.username) {
+    const statusEl = document.createElement('span');
+    const status = message.status || 'sent'; // possible: sent, delivered, read
+    statusEl.className = `message-status ${status}`;
+    let svg = '';
+    if (status === 'sent') {
+      svg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+    } else if (status === 'delivered') {
+      svg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/><polyline points="22 6 11 17 6 12"/></svg>';
+    } else if (status === 'read') {
+      svg = '<svg viewBox="0 0 24 24" fill="none" stroke="#34B7F1" stroke-width="2"><polyline points="20 6 9 17 4 12"/><polyline points="22 6 11 17 6 12"/></svg>';
+    }
+    statusEl.innerHTML = svg;
+    bubble.appendChild(statusEl);
+  }
 
   messageDiv.appendChild(bubble);
   messageDiv.appendChild(reactionsDiv);
   messageDiv.appendChild(time);
   messagesContainer.appendChild(messageDiv);
+  // context menu on right-click / long-press
+  messageDiv.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    showMessageContextMenu(e.clientX, e.clientY, message, messageDiv);
+  });
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
 };
 
@@ -393,7 +601,22 @@ const loadChat = async (username) => {
     if (!data.chat || data.chat.length === 0) {
       clearMessages();
     } else {
-      data.chat.forEach(renderMessage);
+      // render messages with date separators
+      let lastDateKey = null;
+      data.chat.forEach((msg) => {
+        const msgDateKey = new Date(msg.timestamp).toDateString();
+        if (msgDateKey !== lastDateKey) {
+          const sep = document.createElement('div');
+          sep.className = 'date-separator';
+          const span = document.createElement('span');
+          span.textContent = msgDateKey;
+          span.dataset.dateKey = msgDateKey;
+          sep.appendChild(span);
+          messagesContainer.appendChild(sep);
+          lastDateKey = msgDateKey;
+        }
+        renderMessage(msg);
+      });
     }
     updatePinnedMessages();
     await renderSidebar();
@@ -425,18 +648,33 @@ const connectSocket = () => {
     console.error('Socket connection failed:', error);
   });
 
+  socket.on('unreadSummary', (data) => {
+    // data.partners = [{ username, unreadCount }]
+    console.log('unreadSummary received', data);
+    // re-render sidebar to reflect unread counts
+    renderSidebar();
+  });
+
   socket.on('message', (message) => {
+    insertDateSeparatorIfNeeded(message.timestamp);
     renderMessage(message);
     renderSidebar();
   });
 
-  socket.on('messageDeleted', ({ messageId }) => {
+  socket.on('messageDeleted', (payload) => {
+    const { messageId, global } = payload || {};
     const messageDiv = messagesContainer.querySelector(`[data-message-id="${messageId}"]`);
     if (!messageDiv) return;
     const bubble = messageDiv.querySelector('.message-bubble');
     if (!bubble) return;
-    bubble.textContent = 'Message was deleted';
-    bubble.classList.add('deleted-message');
+    if (global) {
+      bubble.textContent = 'Message was deleted';
+      bubble.classList.add('deleted-message');
+    } else {
+      // per-user hide: remove message from this user's view
+      messageDiv.remove();
+    }
+    updatePinnedMessages();
   });
 
   socket.on('typing', ({ username }) => {
@@ -464,6 +702,15 @@ const connectSocket = () => {
   socket.on('userOffline', ({ username }) => {
     if (username !== currentUser.username) {
       updateUserStatus(username, 'Offline');
+    }
+  });
+
+  socket.on('userDeleted', ({ username }) => {
+    // refresh UI when a user is removed
+    renderSidebar();
+    if (currentUser.isOwner) loadUsers();
+    if (selectedPartner === username) {
+      selectedPartner = null; clearMessages();
     }
   });
 };
@@ -519,17 +766,22 @@ const updatePinnedMessages = () => {
   });
 };
 
-const deleteMessage = async (messageId) => {
+const deleteMessage = async (messageId, forEveryone = false) => {
   if (!selectedPartner) return;
   const chatPath = currentUser.isOwner ? selectedPartner : 'owner';
   try {
-    await api(`/chat/${chatPath}/message/${messageId}`, { method: 'DELETE' });
+    await api(`/chat/${chatPath}/message/${messageId}?forEveryone=${forEveryone ? '1' : '0'}`, { method: 'DELETE' });
     const messageDiv = messagesContainer.querySelector(`[data-message-id="${messageId}"]`);
     if (!messageDiv) return;
     const bubble = messageDiv.querySelector('.message-bubble');
     if (!bubble) return;
-    bubble.textContent = 'Message was deleted';
-    bubble.classList.add('deleted-message');
+    if (currentUser.isOwner) {
+      bubble.textContent = 'Message was deleted';
+      bubble.classList.add('deleted-message');
+    } else {
+      // For non-owner deletions we remove the message from view (delete-for-me semantics)
+      messageDiv.remove();
+    }
     updatePinnedMessages();
     await renderSidebar();
   } catch (error) {
@@ -685,34 +937,66 @@ logoutBtn.addEventListener('click', async (event) => {
 messageForm.addEventListener('submit', (event) => {
   event.preventDefault();
   event.stopPropagation();
+  if (!selectedPartner || !socket) return;
   const text = messageInput.value.trim();
-  if (!text || !selectedPartner || !socket) return;
-  socket.emit('message', { type: 'text', text });
-  messageInput.value = '';
-  stopTyping();
+
+  const sendMessage = async () => {
+    // send pending file first
+    if (pendingFile) {
+      const formData = new FormData();
+      formData.append('file', pendingFile);
+      try {
+        const upload = await api('/upload', { method: 'POST', body: formData });
+        const type = pendingFile.type.startsWith('image/') ? 'image' : 'file';
+        const payload = { type, url: upload.url, filename: upload.filename, mime: upload.mime, text: '' };
+        if (replyTo) payload.reply_to = replyTo.id;
+        socket.emit('message', payload);
+      } catch (error) {
+        alert('Failed to upload file: ' + error.message);
+      } finally {
+        pendingFile = null;
+        fileInput.value = '';
+        hideElement(filePreview);
+      }
+    }
+
+    if (text) {
+      const payload = { type: 'text', text };
+      if (replyTo) payload.reply_to = replyTo.id;
+      socket.emit('message', payload);
+      messageInput.value = '';
+    }
+
+    clearReplyPreview();
+    stopTyping();
+  };
+
+  sendMessage();
 });
 
-fileInput.addEventListener('change', async (event) => {
+fileInput.addEventListener('change', (event) => {
   event.preventDefault();
   event.stopPropagation();
   const file = fileInput.files[0];
-  if (!file || !selectedPartner || !socket) return;
-  const formData = new FormData();
-  formData.append('file', file);
-  try {
-    const upload = await api('/upload', { method: 'POST', body: formData });
-    const type = file.type.startsWith('image/') ? 'image' : 'file';
-    socket.emit('message', {
-      type,
-      url: upload.url,
-      filename: upload.filename,
-      mime: upload.mime,
-      text: ''
+  if (!file) return;
+  pendingFile = file;
+  // show preview
+  if (filePreview) {
+    filePreview.innerHTML = '';
+    const name = document.createElement('div');
+    name.className = 'file-name';
+    name.textContent = file.name;
+    filePreview.appendChild(name);
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'file-remove';
+    removeBtn.textContent = 'Remove';
+    removeBtn.addEventListener('click', () => {
+      pendingFile = null;
+      fileInput.value = '';
+      hideElement(filePreview);
     });
-    fileInput.value = '';
-  } catch (error) {
-    alert('Failed to upload file: ' + error.message);
-    fileInput.value = '';
+    filePreview.appendChild(removeBtn);
+    showElement(filePreview);
   }
 });
 
@@ -788,6 +1072,27 @@ closeManageBtn.addEventListener('click', () => hideElement(manageUsersModal));
 closeActionsBtn.addEventListener('click', () => hideElement(userActionsModal));
 cancelChangeBtn.addEventListener('click', () => hideElement(changePasswordModal));
 changePasswordForm.addEventListener('submit', changePassword);
+
+if (deleteUserBtn) {
+  deleteUserBtn.addEventListener('click', async (event) => {
+    event.preventDefault(); event.stopPropagation();
+    const username = actionUsername.textContent;
+    if (!username) return;
+    if (!confirm(`Delete user ${username}? This will remove the user and their chat history.`)) return;
+    try {
+      await api(`/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
+      hideElement(userActionsModal);
+      await renderSidebar();
+      await loadUsers();
+      if (selectedPartner === username) {
+        selectedPartner = null; clearMessages();
+      }
+      alert('User deleted');
+    } catch (err) {
+      alert('Unable to delete user: ' + err.message);
+    }
+  });
+}
 
 const stopTyping = () => {
   if (isTyping && socket) {

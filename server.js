@@ -239,6 +239,54 @@ app.post('/users', requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+app.delete('/users/:username', requireAuth, async (req, res) => {
+  if (!req.session.user.isOwner) {
+    return res.status(403).json({ error: 'Only owner may delete users' });
+  }
+  const username = req.params.username;
+  if (!username || username === 'owner') {
+    return res.status(400).json({ error: 'Invalid username' });
+  }
+
+  const existing = await findUser(username);
+  if (!existing) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  try {
+    if (useMongo) {
+      await usersCollection.deleteOne({ username });
+      await chatsCollection.deleteOne({ username });
+    } else {
+      users = users.filter(u => u.username !== username);
+      saveUsers();
+      if (chats.chats[username]) {
+        delete chats.chats[username];
+        saveChats();
+      }
+    }
+
+    // Notify any connected sockets for that user and disconnect them
+    for (const [uname, info] of onlineUsers.entries()) {
+      if (uname === username && info && info.socketId) {
+        try {
+          const s = io.sockets.sockets.get(info.socketId);
+          if (s) s.disconnect(true);
+        } catch (e) { /* ignore */ }
+        onlineUsers.delete(uname);
+      }
+    }
+
+    // Inform owners/clients to refresh their lists
+    io.emit('userDeleted', { username });
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to delete user:', err);
+    return res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
 app.put('/users/:username/password', requireAuth, async (req, res) => {
   if (!req.session.user.isOwner) {
     return res.status(403).json({ error: 'Only owner may change user passwords' });
@@ -337,6 +385,7 @@ app.delete('/chat/:username/message/:messageId', requireAuth, async (req, res) =
   const messageId = req.params.messageId;
   const current = req.session.user;
   let chatOwner = partner;
+  const forEveryone = req.query.forEveryone === '1' || req.query.forEveryone === 'true';
 
   if (!current.isOwner) {
     if (partner !== 'owner') {
@@ -358,18 +407,35 @@ app.delete('/chat/:username/message/:messageId', requireAuth, async (req, res) =
   }
 
   const original = chat[messageIndex];
-  chat[messageIndex] = {
-    id: messageId,
-    from: original.from,
-    type: 'deleted',
-    text: 'Message was deleted',
-    timestamp: original.timestamp,
-    unread: false
-  };
 
+  if (current.isOwner) {
+    // Owner deletion: respect forEveryone to delete globally (affects both owner and user views)
+    // We mark the message as deleted (keeps timeline but shows placeholder)
+    chat[messageIndex] = Object.assign({}, original, {
+      type: 'deleted',
+      text: 'Message was deleted',
+      unread: false
+    });
+    await saveChatForUser(chatOwner, chat);
+    // inform everyone in that room that message was deleted
+    io.to(`room_${chatOwner}`).emit('messageDeleted', { messageId, global: true });
+    return res.json({ success: true });
+  }
+
+  // Non-owner deletion: always perform a "delete for me" (including when asking forEveryone)
+  // We implement this by recording that this message is hidden from this username.
+  if (!original.hiddenFrom) original.hiddenFrom = [];
+  if (!original.hiddenFrom.includes(current.username)) original.hiddenFrom.push(current.username);
+  chat[messageIndex] = original;
   await saveChatForUser(chatOwner, chat);
-  io.to(`room_${chatOwner}`).emit('messageDeleted', { messageId });
-  res.json({ success: true });
+
+  // Notify only the deleting user's socket(s) so owner is NOT informed
+  const target = onlineUsers.get(current.username);
+  if (target && target.socketId) {
+    io.to(target.socketId).emit('messageDeleted', { messageId, global: false });
+  }
+
+  return res.json({ success: true });
 });
 
 const storage = multer.diskStorage({
@@ -413,23 +479,73 @@ io.on('connection', async (socket) => {
       return;
     }
   } else {
-    const partnerUser = await findUser(partner);
-    if (!partner || !partnerUser || partner === 'owner') {
-      socket.disconnect(true);
-      return;
+    // For owner sockets, partner may be provided (when owner opens a specific chat) or omitted.
+    if (partner) {
+      const partnerUser = await findUser(partner);
+      if (!partnerUser || partner === 'owner') {
+        socket.disconnect(true);
+        return;
+      }
     }
   }
 
-  const room = roomName(partner);
-  socket.join(room);
+  const room = partner ? roomName(partner) : null;
+  if (room) socket.join(room);
+
+  // If owner connected, join them into all user rooms so they receive live messages for all users
+  if (isOwner) {
+    try {
+      const allUsers = await getAllUsers(); // only non-owner users
+      for (const u of allUsers) {
+        const r = roomName(u.username);
+        socket.join(r);
+        // notify the room that owner is online
+        io.to(r).emit('userOnline', { username });
+      }
+
+      // Build unread summary and push unread messages to the owner socket
+      const summary = [];
+      for (const u of allUsers) {
+        const chat = await getChatForUser(u.username);
+        const unreadMsgs = chat.filter(m => m.from === u.username && m.unread);
+        if (unreadMsgs.length > 0) {
+          summary.push({ username: u.username, unreadCount: unreadMsgs.length });
+          // emit unread messages to owner socket so they are notified immediately
+          for (const msg of unreadMsgs) {
+            // send historic flag so client can treat it as already-stored message
+            const historic = Object.assign({}, msg, { historic: true });
+            socket.emit('message', historic);
+          }
+        }
+      }
+      if (summary.length > 0) {
+        socket.emit('unreadSummary', { partners: summary });
+      }
+    } catch (err) {
+      console.error('Error while preparing owner rooms/unread summary:', err);
+    }
+  }
 
   // Track online status
   onlineUsers.set(username, { socketId: socket.id, partner, isOwner });
-  io.to(room).emit('userOnline', { username });
+  if (room) {
+    io.to(room).emit('userOnline', { username });
+  }
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     onlineUsers.delete(username);
-    io.to(room).emit('userOffline', { username });
+    if (isOwner) {
+      try {
+        const allUsers = await getAllUsers();
+        for (const u of allUsers) {
+          io.to(roomName(u.username)).emit('userOffline', { username });
+        }
+      } catch (err) {
+        console.error('Error emitting owner offline to rooms:', err);
+      }
+    } else if (room) {
+      io.to(room).emit('userOffline', { username });
+    }
   });
 
   socket.on('message', async (data) => {
