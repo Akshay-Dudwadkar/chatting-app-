@@ -46,6 +46,7 @@ const menuBtn = document.getElementById('menu-btn');
 const menuDropdown = document.getElementById('menu-dropdown');
 const createUserBtn = document.getElementById('create-user-menu-btn');
 const manageUsersBtn = document.getElementById('manage-users-menu-btn');
+const viewStatsBtn = document.getElementById('view-stats-menu-btn');
 const darkModeBtn = document.getElementById('dark-mode-menu-btn');
 const darkModeIcon = document.getElementById('dark-mode-icon');
 const logoutBtn = document.getElementById('logout-menu-btn');
@@ -249,11 +250,17 @@ const showChatApp = () => {
     sidebarTitle.textContent = 'Owner Dashboard';
     showElement(ownerInfo);
     showElement(ownerControls);
+    showElement(createUserBtn);
+    showElement(manageUsersBtn);
+    showElement(viewStatsBtn);
     document.body.classList.add('owner-mode');
   } else {
     sidebarTitle.textContent = 'Chat with Owner';
     hideElement(ownerInfo);
     hideElement(ownerControls);
+    hideElement(createUserBtn);
+    hideElement(manageUsersBtn);
+    hideElement(viewStatsBtn);
     document.body.classList.remove('owner-mode');
   }
 
