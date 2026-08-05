@@ -33,6 +33,16 @@ const closeManageBtn = document.getElementById('close-manage');
 const closeActionsBtn = document.getElementById('close-actions');
 const cancelChangeBtn = document.getElementById('cancel-change');
 const searchBtn = document.getElementById('search-btn');
+const notifyBtn = document.getElementById('notify-btn');
+const notifyModal = document.getElementById('notify-modal');
+const notifyForm = document.getElementById('notify-form');
+const notifyRecipient = document.getElementById('notify-recipient');
+const notifyPermanent = document.getElementById('notify-permanent');
+const notifyEmail = document.getElementById('notify-email');
+const notifyMessage = document.getElementById('notify-message');
+const cancelNotifyBtn = document.getElementById('cancel-notify');
+const setEmailBtn = document.getElementById('set-email-btn');
+const notifyUserBtn = document.getElementById('notify-user-btn');
 const messageSearch = document.getElementById('message-search');
 const searchInput = document.getElementById('search-input');
 const searchResults = document.getElementById('search-results');
@@ -424,16 +434,21 @@ const renderMessage = (message) => {
   if (!message || !message.id) return;
   if (message.hiddenFrom && currentUser && message.hiddenFrom.includes(currentUser.username)) return;
   if (messagesContainer.querySelector(`[data-message-id="${message.id}"]`)) return;
+  const isAnnouncement = message.type === 'announcement';
+  const messageClass = isAnnouncement ? 'announcement' : (message.from === currentUser.username ? 'sent' : 'received');
   const messageDiv = document.createElement('div');
-  messageDiv.className = `message ${message.from === currentUser.username ? 'sent' : 'received'}`;
+  messageDiv.className = `message ${messageClass}`;
   messageDiv.dataset.messageId = message.id;
 
   const bubble = document.createElement('div');
-  bubble.className = 'message-bubble';
+  bubble.className = `message-bubble${isAnnouncement ? ' announcement-bubble' : ''}`;
 
   if (message.type === 'deleted') {
     bubble.textContent = 'Message was deleted';
     bubble.classList.add('deleted-message');
+  } else if (isAnnouncement) {
+    bubble.innerHTML = `<strong>Announcement</strong><br>${message.text}`;
+    bubble.classList.add('permanent-announcement');
   } else if (message.type === 'text') {
     bubble.textContent = message.text;
   } else if (message.type === 'image' || message.type === 'file') {
@@ -1065,6 +1080,85 @@ changePasswordBtn.addEventListener('click', (event) => {
   showElement(changePasswordModal);
 });
 
+// Notify modal handling
+if (notifyBtn) {
+  notifyBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!currentUser) return alert('Please login first');
+    notifyEmail.value = currentUser.email || '';
+    notifyMessage.value = '';
+    if (currentUser.isOwner) {
+      populateNotifyRecipientOptions();
+      showElement(document.querySelector('.notify-options'));
+    } else {
+      setNotifyRecipient('owner');
+      hideElement(document.querySelector('.notify-options'));
+    }
+    showElement(notifyModal);
+  });
+}
+
+const populateNotifyRecipientOptions = () => {
+  notifyRecipient.innerHTML = '';
+  const selectedLabel = selectedPartner ? `${selectedPartner} (selected)` : '';
+  if (selectedPartner) {
+    const option = document.createElement('option');
+    option.value = selectedPartner;
+    option.textContent = selectedLabel;
+    notifyRecipient.appendChild(option);
+  }
+  const allOption = document.createElement('option');
+  allOption.value = 'all';
+  allOption.textContent = 'All users';
+  notifyRecipient.appendChild(allOption);
+  if (!selectedPartner) {
+    notifyRecipient.value = 'all';
+  }
+};
+
+const setNotifyRecipient = (value) => {
+  notifyRecipient.innerHTML = '';
+  const option = document.createElement('option');
+  option.value = value;
+  option.textContent = value === 'owner' ? 'Owner' : value;
+  notifyRecipient.appendChild(option);
+};
+
+if (cancelNotifyBtn) {
+  cancelNotifyBtn.addEventListener('click', (e) => { e.preventDefault(); hideElement(notifyModal); });
+}
+
+if (notifyForm) {
+  notifyForm.addEventListener('submit', async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const to = notifyRecipient.value.trim();
+    const message = notifyMessage.value.trim();
+    const fromEmailVal = notifyEmail.value.trim();
+    const announcement = notifyPermanent?.checked || false;
+    if (!to) return alert('Select a recipient first');
+    if (!message) return alert('Enter a message');
+
+    try {
+      if (fromEmailVal && fromEmailVal !== (currentUser.email || '')) {
+        await api('/me/email', {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: fromEmailVal })
+        });
+        currentUser.email = fromEmailVal;
+      }
+
+      await api('/notify', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, message, fromEmail: fromEmailVal, announcement })
+      });
+      alert('Notification sent');
+      hideElement(notifyModal);
+    } catch (err) {
+      alert('Unable to send notification: ' + err.message);
+    }
+  });
+}
+
 deleteChatBtn.addEventListener('click', async (event) => {
   event.preventDefault();
   event.stopPropagation();
@@ -1100,6 +1194,41 @@ if (deleteUserBtn) {
     }
   });
 }
+
+  // Owner: set email for a user from actions modal
+  if (setEmailBtn) {
+    setEmailBtn.addEventListener('click', async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const username = actionUsername.textContent;
+      if (!username) return;
+      const email = prompt(`Enter email for ${username}`);
+      if (!email) return;
+      try {
+        await api(`/users/${encodeURIComponent(username)}/email`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        alert('Email updated for ' + username);
+        hideElement(userActionsModal);
+      } catch (err) {
+        alert('Unable to update email: ' + err.message);
+      }
+    });
+  }
+
+  // Owner: open notify modal targeting selected user from actions modal
+  if (notifyUserBtn) {
+    notifyUserBtn.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const username = actionUsername.textContent;
+      if (!username) return;
+      notifyRecipient.value = username;
+      notifyEmail.value = currentUser.email || '';
+      notifyMessage.value = '';
+      hideElement(userActionsModal);
+      showElement(notifyModal);
+    });
+  }
 
 const stopTyping = () => {
   if (isTyping && socket) {

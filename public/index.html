@@ -123,6 +123,9 @@
               <button type="button" id="call-btn" class="icon-btn" title="Voice Call" aria-label="Call">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
               </button>
+              <button type="button" id="notify-btn" class="icon-btn" title="Notify" aria-label="Notify">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0v3l-2 2v1h16v-1l-2-2V8"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              </button>
               <button type="button" id="more-btn" class="icon-btn" title="More Options" aria-label="More">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
               </button>
@@ -199,6 +202,8 @@
       <div class="modal-content">
         <h3>Actions for <span id="action-username"></span></h3>
         <div class="modal-actions">
+          <button type="button" id="set-email-btn">Set Email</button>
+          <button type="button" id="notify-user-btn">Notify User</button>
           <button type="button" id="change-password-btn">Change Password</button>
           <button type="button" id="delete-chat-btn" class="danger">Delete Chat</button>
             <button type="button" id="delete-user-btn" class="danger">Delete User</button>
@@ -223,6 +228,37 @@
     </div>
 
   </div>
+  
+    <div id="notify-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Send Notification</h3>
+        <form id="notify-form">
+          <div class="field">
+            <label for="notify-recipient">Recipient</label>
+            <select id="notify-recipient">
+              <option value="owner">Owner</option>
+            </select>
+          </div>
+          <div class="field notify-options hidden">
+            <label for="notify-permanent">
+              <input type="checkbox" id="notify-permanent" /> Permanent announcement for all users
+            </label>
+          </div>
+          <div class="field">
+            <label for="notify-email">Your Email (optional)</label>
+            <input type="email" id="notify-email" placeholder="your.email@gmail.com" />
+          </div>
+          <div class="field">
+            <label for="notify-message">Message</label>
+            <textarea id="notify-message" rows="4" placeholder="Enter notification message" required></textarea>
+          </div>
+          <div class="form-buttons">
+            <button type="submit">Send</button>
+            <button type="button" id="cancel-notify">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
   <script src="app.js"></script>
 </body>
 </html>

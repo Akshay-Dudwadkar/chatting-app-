@@ -8,6 +8,7 @@ const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const { MongoClient } = require('mongodb');
 const { Server } = require('socket.io');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const server = http.createServer(app);
@@ -200,7 +201,7 @@ app.post('/login', async (req, res) => {
     return res.status(401).json({ error: 'Invalid username or password' });
   }
 
-  req.session.user = { username: user.username, isOwner: !!user.isOwner };
+  req.session.user = { username: user.username, isOwner: !!user.isOwner, email: user.email || null };
   res.json({ success: true, user: req.session.user });
 });
 
@@ -215,6 +216,20 @@ app.get('/me', (req, res) => {
   res.json({ user: req.session.user });
 });
 
+// Allow current user to set their own email
+app.put('/me/email', requireAuth, async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+  const username = req.session.user.username;
+  const user = await findUser(username);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  user.email = email;
+  await upsertUser(user);
+  // update session
+  req.session.user.email = email;
+  res.json({ success: true });
+});
+
 app.get('/users', requireAuth, async (req, res) => {
   if (!req.session.user.isOwner) {
     return res.status(403).json({ error: 'Only owner may access users' });
@@ -227,7 +242,7 @@ app.post('/users', requireAuth, async (req, res) => {
   if (!req.session.user.isOwner) {
     return res.status(403).json({ error: 'Only owner may create new users' });
   }
-  const { username, password } = req.body;
+  const { username, password, email } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password required' });
   }
@@ -235,8 +250,105 @@ app.post('/users', requireAuth, async (req, res) => {
   if (existingUser) {
     return res.status(400).json({ error: 'User already exists' });
   }
-  await upsertUser({ username, password, isOwner: false });
+  await upsertUser({ username, password, isOwner: false, email: email || null });
   res.json({ success: true });
+});
+
+// Allow owner to set or update a user's email address
+app.put('/users/:username/email', requireAuth, async (req, res) => {
+  if (!req.session.user.isOwner) {
+    return res.status(403).json({ error: 'Only owner may update user email' });
+  }
+  const username = req.params.username;
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+  const user = await findUser(username);
+  if (!user || user.isOwner) return res.status(404).json({ error: 'User not found' });
+  user.email = email;
+  await upsertUser(user);
+  res.json({ success: true });
+});
+
+// Send notification emails between users/owner and support owner broadcasts
+app.post('/notify', requireAuth, async (req, res) => {
+  const { to, subject, message, fromEmail, announcement } = req.body || {};
+  const current = req.session.user;
+  if (!to || !message) return res.status(400).json({ error: 'Recipient and message are required' });
+
+  // Non-owner users can only notify the owner
+  if (!current.isOwner && to !== 'owner') {
+    return res.status(403).json({ error: 'Only owner may notify other users' });
+  }
+
+  const mailSubject = subject || `Notification from ${current.username}`;
+  const text = `From: ${current.username}\n\n${message}` + (fromEmail ? `\n\nReply-to: ${fromEmail}` : '');
+  const html = `<p><strong>From:</strong> ${current.username}</p><p>${message.replace(/\n/g, '<br/>')}</p>`;
+  const messagePayload = {
+    id: uuidv4(),
+    from: current.username,
+    type: announcement ? 'announcement' : 'text',
+    text: message,
+    timestamp: new Date().toISOString(),
+    unread: true,
+    permanent: announcement === true
+  };
+
+  let recipients = [];
+  let storedUsernames = [];
+
+  if (to === 'owner') {
+    const ownerUser = await findUser('owner');
+    if (ownerUser) {
+      if (ownerUser.email) recipients.push(ownerUser.email);
+      const ownerChat = await getChatForUser('owner');
+      ownerChat.push(messagePayload);
+      await saveChatForUser('owner', ownerChat);
+      io.to(`room_owner`).emit('message', messagePayload);
+      storedUsernames.push('owner');
+    }
+  } else if (to === 'all') {
+    const allUsers = await getAllUsers();
+    for (const user of allUsers) {
+      const chatMessage = Object.assign({}, messagePayload, { id: uuidv4() });
+      const userChat = await getChatForUser(user.username);
+      userChat.push(chatMessage);
+      await saveChatForUser(user.username, userChat);
+      if (user.email) recipients.push(user.email);
+      storedUsernames.push(user.username);
+      io.to(`room_${user.username}`).emit('message', chatMessage);
+    }
+  } else {
+    const target = await findUser(to);
+    if (!target) {
+      return res.status(404).json({ error: 'Recipient not found' });
+    }
+    if (target.email) recipients.push(target.email);
+    storedUsernames.push(target.username);
+    const chatMessage = messagePayload;
+    const userChat = await getChatForUser(to);
+    userChat.push(chatMessage);
+    await saveChatForUser(to, userChat);
+    io.to(`room_${to}`).emit('message', chatMessage);
+  }
+
+  if (storedUsernames.length === 0) {
+    return res.status(404).json({ error: 'No valid recipient found' });
+  }
+
+  if (recipients.length === 0) {
+    console.warn('Notification stored but no email configured for recipients:', to);
+    return res.json({ success: true, emailSent: false });
+  }
+
+  try {
+    for (const r of recipients) {
+      await sendEmailNotification(r, mailSubject, text, html);
+    }
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to send notify emails:', err);
+    return res.status(500).json({ error: 'Failed to send notification' });
+  }
 });
 
 app.delete('/users/:username', requireAuth, async (req, res) => {
@@ -573,6 +685,21 @@ io.on('connection', async (socket) => {
     chat.push(message);
     await saveChatForUser(partner, chat);
     io.to(room).emit('message', message);
+
+    // If owner sent a message to a user, send an email notification (if configured and user has email)
+    try {
+      if (message.from === 'owner') {
+        const recipientUser = await findUser(partner);
+        if (recipientUser && recipientUser.email) {
+          const subject = `New message from owner`;
+          const text = `You have a new message from owner:\n\n${message.text}`;
+          const html = `<p>You have a new message from owner:</p><p>${message.text}</p>`;
+          await sendEmailNotification(recipientUser.email, subject, text, html);
+        }
+      }
+    } catch (err) {
+      console.error('Error sending notification email:', err);
+    }
   });
 
   socket.on('webrtc-offer', (payload) => {
@@ -618,6 +745,48 @@ io.on('connection', async (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
+// Configure email transporter (SMTP / Gmail). Set env vars: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_SERVICE, EMAIL_FROM
+let transporter = null;
+try {
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 465,
+      secure: process.env.SMTP_PORT ? process.env.SMTP_PORT === '465' : true,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+  } else if (process.env.EMAIL_SERVICE && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    transporter = nodemailer.createTransport({
+      service: process.env.EMAIL_SERVICE,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+  }
+} catch (err) {
+  console.error('Failed to configure email transporter:', err);
+  transporter = null;
+}
+
+const sendEmailNotification = async (to, subject, text, html) => {
+  if (!transporter || !to) return;
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+      to,
+      subject,
+      text,
+      html
+    });
+  } catch (err) {
+    console.error('Failed to send notification email to', to, err);
+  }
+};
 
 const startServer = async () => {
   if (useMongo) {
