@@ -217,17 +217,95 @@ app.get('/me', (req, res) => {
 });
 
 // Allow current user to set their own email
+const isValidEmail = (email) => typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
 app.put('/me/email', requireAuth, async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email is required' });
+  if (!isValidEmail(email)) return res.status(400).json({ error: 'Invalid email address' });
   const username = req.session.user.username;
   const user = await findUser(username);
   if (!user) return res.status(404).json({ error: 'User not found' });
   user.email = email;
   await upsertUser(user);
-  // update session
   req.session.user.email = email;
   res.json({ success: true });
+});
+
+app.get('/owner/email', requireAuth, async (req, res) => {
+  if (!req.session.user.isOwner) {
+    return res.status(403).json({ error: 'Only owner may access owner email' });
+  }
+  const owner = await findUser('owner');
+  res.json({ ownerEmail: owner?.email || '' });
+});
+
+app.put('/owner/email', requireAuth, async (req, res) => {
+  if (!req.session.user.isOwner) {
+    return res.status(403).json({ error: 'Only owner may update owner email' });
+  }
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+  if (!isValidEmail(email)) return res.status(400).json({ error: 'Invalid email address' });
+  const owner = await findUser('owner');
+  if (!owner) return res.status(404).json({ error: 'Owner not found' });
+  owner.email = email;
+  await upsertUser(owner);
+  req.session.user.email = email;
+  res.json({ success: true });
+});
+
+app.post('/email/notify-owner', requireAuth, async (req, res) => {
+  const { email, message } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+  if (!isValidEmail(email)) return res.status(400).json({ error: 'Invalid email address' });
+  if (!message) return res.status(400).json({ error: 'Message is required' });
+
+  const current = req.session.user;
+  const owner = await findUser('owner');
+  if (!owner) return res.status(404).json({ error: 'Owner not found' });
+  if (!owner.email) return res.status(400).json({ error: 'Owner email is not configured' });
+
+  const user = await findUser(current.username);
+  if (user) {
+    user.email = email;
+    await upsertUser(user);
+    req.session.user.email = email;
+  }
+
+  try {
+    const subject = `New notification from ${current.username}`;
+    const text = `Sender: ${current.username} <${email}>
+
+${message}`;
+    const html = `<p><strong>Sender:</strong> ${current.username} &lt;${email}&gt;</p><p>${message.replace(/\n/g, '<br/>')}</p>`;
+    await sendEmailNotification(owner.email, subject, text, html);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to send owner notification email:', error);
+    res.status(500).json({ error: 'Failed to send email' });
+  }
+});
+
+app.post('/email/send-to-user', requireAuth, async (req, res) => {
+  if (!req.session.user.isOwner) {
+    return res.status(403).json({ error: 'Only owner may send email to user' });
+  }
+  const { toEmail, subject, message } = req.body;
+  if (!toEmail) return res.status(400).json({ error: 'User Email is required' });
+  if (!isValidEmail(toEmail)) return res.status(400).json({ error: 'Invalid user email address' });
+  if (!message) return res.status(400).json({ error: 'Message is required' });
+
+  try {
+    const emailSubject = subject || 'Message from owner';
+    const text = `Message from owner:\n\n${message}`;
+    const html = `<p>Message from owner:</p><p>${message.replace(/\n/g, '<br/>')}</p>`;
+    await sendEmailNotification(toEmail, emailSubject, text, html);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to send email to user:', error);
+    res.status(500).json({ error: 'Failed to send email' });
+  }
 });
 
 app.get('/users', requireAuth, async (req, res) => {
@@ -774,18 +852,19 @@ try {
 }
 
 const sendEmailNotification = async (to, subject, text, html) => {
-  if (!transporter || !to) return;
-  try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
-      to,
-      subject,
-      text,
-      html
-    });
-  } catch (err) {
-    console.error('Failed to send notification email to', to, err);
+  if (!transporter) {
+    throw new Error('Email transporter is not configured');
   }
+  if (!to) {
+    throw new Error('Missing recipient email address');
+  }
+  return transporter.sendMail({
+    from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+    to,
+    subject,
+    text,
+    html
+  });
 };
 
 const startServer = async () => {

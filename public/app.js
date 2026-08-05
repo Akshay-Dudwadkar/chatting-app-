@@ -41,6 +41,24 @@ const notifyPermanent = document.getElementById('notify-permanent');
 const notifyEmail = document.getElementById('notify-email');
 const notifyMessage = document.getElementById('notify-message');
 const cancelNotifyBtn = document.getElementById('cancel-notify');
+const notifyUserModal = document.getElementById('notify-user-modal');
+const notifyUserForm = document.getElementById('notify-user-form');
+const notifyUserEmail = document.getElementById('notify-user-email');
+const notifyUserMessage = document.getElementById('notify-user-message');
+const notifyUserStatus = document.getElementById('notify-user-status');
+const cancelNotifyUserBtn = document.getElementById('cancel-notify-user');
+const emailManagementMenuBtn = document.getElementById('email-management-menu-btn');
+const emailManagementModal = document.getElementById('email-management-modal');
+const emailManagementForm = document.getElementById('email-management-form');
+const ownerEmailInput = document.getElementById('owner-email-input');
+const userEmailInput = document.getElementById('user-email-input');
+const userEmailSubject = document.getElementById('user-email-subject');
+const userEmailMessage = document.getElementById('user-email-message');
+const ownerEmailStatus = document.getElementById('owner-email-status');
+const userEmailStatus = document.getElementById('user-email-status');
+const ownerEmailSaveBtn = document.getElementById('owner-email-save-btn');
+const userEmailSendBtn = document.getElementById('user-email-send-btn');
+const cancelEmailManagementBtn = document.getElementById('cancel-email-management');
 const setEmailBtn = document.getElementById('set-email-btn');
 const notifyUserBtn = document.getElementById('notify-user-btn');
 const messageSearch = document.getElementById('message-search');
@@ -1127,6 +1145,9 @@ const setNotifyRecipient = (value) => {
 if (cancelNotifyBtn) {
   cancelNotifyBtn.addEventListener('click', (e) => { e.preventDefault(); hideElement(notifyModal); });
 }
+if (cancelNotifyUserBtn) {
+  cancelNotifyUserBtn.addEventListener('click', (e) => { e.preventDefault(); hideElement(notifyUserModal); notifyUserStatus.textContent = ''; notifyUserStatus.className = 'status-text'; });
+}
 
 if (notifyForm) {
   notifyForm.addEventListener('submit', async (e) => {
@@ -1155,6 +1176,141 @@ if (notifyForm) {
       hideElement(notifyModal);
     } catch (err) {
       alert('Unable to send notification: ' + err.message);
+    }
+  });
+}
+
+if (notifyUserForm) {
+  notifyUserForm.addEventListener('submit', async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const email = notifyUserEmail.value.trim();
+    const message = notifyUserMessage.value.trim() || 'Please contact me.';
+    if (!email) {
+      notifyUserStatus.textContent = 'Email address is required.';
+      notifyUserStatus.className = 'status-text error';
+      return;
+    }
+    notifyUserStatus.textContent = 'Sending...';
+    notifyUserStatus.className = 'status-text';
+    try {
+      await api('/email/notify-owner', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, message })
+      });
+      notifyUserStatus.textContent = 'Email sent to owner successfully.';
+      notifyUserStatus.className = 'status-text success';
+      currentUser.email = email;
+      setTimeout(() => {
+        hideElement(notifyUserModal);
+        notifyUserStatus.textContent = '';
+        notifyUserStatus.className = 'status-text';
+      }, 1600);
+    } catch (err) {
+      notifyUserStatus.textContent = 'Failed to send email: ' + err.message;
+      notifyUserStatus.className = 'status-text error';
+    }
+  });
+}
+
+if (cancelEmailManagementBtn) {
+  cancelEmailManagementBtn.addEventListener('click', (e) => { e.preventDefault(); hideElement(emailManagementModal); ownerEmailStatus.textContent = ''; userEmailStatus.textContent = ''; });
+}
+
+const loadOwnerEmail = async () => {
+  if (!ownerEmailInput) return;
+  try {
+    const data = await api('/owner/email');
+    ownerEmailInput.value = data.ownerEmail || '';
+    ownerEmailStatus.textContent = 'Current owner email loaded.';
+    ownerEmailStatus.className = 'status-text';
+  } catch (err) {
+    ownerEmailStatus.textContent = 'Unable to load owner email.';
+    ownerEmailStatus.className = 'status-text error';
+  }
+};
+
+if (ownerEmailSaveBtn) {
+  ownerEmailSaveBtn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    const email = ownerEmailInput.value.trim();
+    if (!email) {
+      ownerEmailStatus.textContent = 'Owner email is required.';
+      ownerEmailStatus.className = 'status-text error';
+      return;
+    }
+    ownerEmailStatus.textContent = 'Saving...';
+    ownerEmailStatus.className = 'status-text';
+    try {
+      await api('/owner/email', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      ownerEmailStatus.textContent = 'Owner email saved successfully.';
+      ownerEmailStatus.className = 'status-text success';
+    } catch (err) {
+      ownerEmailStatus.textContent = 'Unable to save owner email: ' + err.message;
+      ownerEmailStatus.className = 'status-text error';
+    }
+  });
+}
+
+if (userEmailSendBtn) {
+  userEmailSendBtn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    const toEmail = userEmailInput.value.trim();
+    const subject = userEmailSubject.value.trim() || 'Message from owner';
+    const message = userEmailMessage.value.trim();
+    if (!toEmail) {
+      userEmailStatus.textContent = 'User email is required.';
+      userEmailStatus.className = 'status-text error';
+      return;
+    }
+    if (!message) {
+      userEmailStatus.textContent = 'Message is required.';
+      userEmailStatus.className = 'status-text error';
+      return;
+    }
+    userEmailStatus.textContent = 'Sending email...';
+    userEmailStatus.className = 'status-text';
+    try {
+      await api('/email/send-to-user', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toEmail, subject, message })
+      });
+      userEmailStatus.textContent = 'Email sent successfully.';
+      userEmailStatus.className = 'status-text success';
+    } catch (err) {
+      userEmailStatus.textContent = 'Failed to send email: ' + err.message;
+      userEmailStatus.className = 'status-text error';
+    }
+  });
+}
+
+if (emailManagementMenuBtn) {
+  emailManagementMenuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (menuDropdown) menuDropdown.classList.add('hidden');
+    showElement(emailManagementModal);
+    loadOwnerEmail();
+  });
+}
+
+if (notifyBtn) {
+  notifyBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!currentUser) return alert('Please login first');
+    if (currentUser.isOwner) {
+      notifyEmail.value = currentUser.email || '';
+      notifyMessage.value = '';
+      populateNotifyRecipientOptions();
+      showElement(document.querySelector('.notify-options'));
+      showElement(notifyModal);
+    } else {
+      notifyUserEmail.value = currentUser.email || '';
+      notifyUserMessage.value = '';
+      notifyUserStatus.textContent = '';
+      notifyUserStatus.className = 'status-text';
+      showElement(notifyUserModal);
     }
   });
 }

@@ -130,6 +130,23 @@ body {
   flex-direction: column;
 }
 
+/* Constrain overall app to viewport and keep scrolling inside the message pane */
+#chat-app {
+  height: 100vh;
+  overflow: hidden; /* prevent page scrolling so only messages scroll */
+}
+
+.chat-layout {
+  height: 100%;
+}
+
+.chat-area {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* ensure only messages container scrolls */
+}
+
 /* ═══════════ LOGIN ═══════════ */
 #login-screen {
   position: relative;
@@ -558,6 +575,16 @@ body.dark-mode .chat-header {
   padding: 1.1rem 1rem 1.25rem;
   display: flex; flex-direction: column; gap: 0.4rem;
   background-image: radial-gradient(circle at top left, rgba(212,168,83,0.06), transparent 24%);
+}
+
+/* Smooth scrolling on mobile and ensure messages never overlap header/input */
+#messages, .messages {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent the message list from expanding behind sticky input/header on very tall screens */
+.messages {
+  max-height: calc(100vh - 112px); /* header + input roughly 112px; tweak if needed */
 }
 
 .message-input-area {
