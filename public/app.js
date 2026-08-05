@@ -44,6 +44,7 @@ const cancelNotifyBtn = document.getElementById('cancel-notify');
 const notifyUserModal = document.getElementById('notify-user-modal');
 const notifyUserForm = document.getElementById('notify-user-form');
 const notifyUserEmail = document.getElementById('notify-user-email');
+const notifyOwnerEmail = document.getElementById('notify-owner-email');
 const notifyUserMessage = document.getElementById('notify-user-message');
 const notifyUserStatus = document.getElementById('notify-user-status');
 const cancelNotifyUserBtn = document.getElementById('cancel-notify-user');
@@ -156,6 +157,7 @@ let pinnedMessageIds = new Set();
 let replyTo = null;
 let pendingFile = null;
 let emojiPickerEl = null;
+const INVITE_MESSAGE = "You're invited to join us for an educational session. If you're available, please come online and be a part of this learning opportunity. We look forward to your participation.";
 
 const insertDateSeparatorIfNeeded = (timestamp) => {
   try {
@@ -1184,9 +1186,15 @@ if (notifyUserForm) {
   notifyUserForm.addEventListener('submit', async (e) => {
     e.preventDefault(); e.stopPropagation();
     const email = notifyUserEmail.value.trim();
-    const message = notifyUserMessage.value.trim() || 'Please contact me.';
+    const ownerEmail = notifyOwnerEmail.value.trim();
+    const message = INVITE_MESSAGE;
     if (!email) {
-      notifyUserStatus.textContent = 'Email address is required.';
+      notifyUserStatus.textContent = 'Your email address is required.';
+      notifyUserStatus.className = 'status-text error';
+      return;
+    }
+    if (!ownerEmail) {
+      notifyUserStatus.textContent = 'Owner email address is required.';
       notifyUserStatus.className = 'status-text error';
       return;
     }
@@ -1195,7 +1203,7 @@ if (notifyUserForm) {
     try {
       await api('/email/notify-owner', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, message })
+        body: JSON.stringify({ email, ownerEmail, message })
       });
       notifyUserStatus.textContent = 'Email sent to owner successfully.';
       notifyUserStatus.className = 'status-text success';

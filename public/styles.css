@@ -953,13 +953,24 @@ body.dark-mode .message-input-area {
   cursor: pointer;
   transition: all var(--transition);
 }
-.form-buttons button[type="button"], .btn-secondary {
+..form-buttons button[type="button"], .btn-secondary {
   background: var(--bg-input);
   color: var(--text-primary);
   border: 1px solid var(--border);
 }
 .form-buttons button[type="button"]:hover, .btn-secondary:hover {
   background: var(--bg-elevated);
+}
+.status-text {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+.status-text.success {
+  color: #2E7D32;
+}
+.status-text.error {
+  color: #C0392B;
 }
 .btn-secondary {
   width: 100%; padding: 0.75rem; margin-top: 1rem;

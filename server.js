@@ -256,16 +256,14 @@ app.put('/owner/email', requireAuth, async (req, res) => {
 });
 
 app.post('/email/notify-owner', requireAuth, async (req, res) => {
-  const { email, message } = req.body;
+  const { email, ownerEmail, message } = req.body;
   if (!email) return res.status(400).json({ error: 'Email is required' });
+  if (!ownerEmail) return res.status(400).json({ error: 'Owner email is required' });
   if (!isValidEmail(email)) return res.status(400).json({ error: 'Invalid email address' });
+  if (!isValidEmail(ownerEmail)) return res.status(400).json({ error: 'Invalid owner email address' });
   if (!message) return res.status(400).json({ error: 'Message is required' });
 
   const current = req.session.user;
-  const owner = await findUser('owner');
-  if (!owner) return res.status(404).json({ error: 'Owner not found' });
-  if (!owner.email) return res.status(400).json({ error: 'Owner email is not configured' });
-
   const user = await findUser(current.username);
   if (user) {
     user.email = email;
@@ -275,11 +273,9 @@ app.post('/email/notify-owner', requireAuth, async (req, res) => {
 
   try {
     const subject = `New notification from ${current.username}`;
-    const text = `Sender: ${current.username} <${email}>
-
-${message}`;
+    const text = `Sender: ${current.username} <${email}>\n\n${message}`;
     const html = `<p><strong>Sender:</strong> ${current.username} &lt;${email}&gt;</p><p>${message.replace(/\n/g, '<br/>')}</p>`;
-    await sendEmailNotification(owner.email, subject, text, html);
+    await sendEmailNotification(ownerEmail, subject, text, html);
     res.json({ success: true });
   } catch (error) {
     console.error('Failed to send owner notification email:', error);
