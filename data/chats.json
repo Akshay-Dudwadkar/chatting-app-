@@ -37,55 +37,6 @@
       }
     ],
     "bob": [],
-    "akshay": [
-      {
-        "id": "9e438587-d842-4f07-827c-77979d5eb496",
-        "from": "owner",
-        "type": "text",
-        "text": "b'",
-        "url": null,
-        "filename": null,
-        "mime": null,
-        "timestamp": "2026-08-24T17:22:15.020Z",
-        "unread": true,
-        "reply_to": null,
-        "replyTo": null
-      },
-      {
-        "id": "ef691b66-80c8-4eb2-92e6-270af8905154",
-        "from": "owner",
-        "type": "image",
-        "text": "",
-        "url": "/uploads/1787593484798-b51e1e97-f041-4563-b428-5aaed6c72ec2-WhatsApp Image 2026-03-31 at 8.57.51 PM.jpeg",
-        "filename": "WhatsApp Image 2026-03-31 at 8.57.51 PM.jpeg",
-        "mime": "image/jpeg",
-        "timestamp": "2026-08-24T17:44:44.810Z",
-        "unread": true,
-        "reply_to": null,
-        "replyTo": null
-      }
-    ],
-    "akshay21": [
-      {
-        "id": "63726a5a-84b7-473d-837f-0c5da1280433",
-        "from": "owner",
-        "type": "text",
-        "text": "uuu",
-        "url": null,
-        "filename": null,
-        "mime": null,
-        "timestamp": "2026-04-09T17:54:34.972Z",
-        "unread": true
-      },
-      {
-        "id": "d2b77d87-4594-4162-be85-29d3d92d6adb",
-        "from": "owner",
-        "type": "deleted",
-        "text": "Message was deleted",
-        "timestamp": "2026-04-09T17:54:49.023Z",
-        "unread": false
-      }
-    ],
     "Rasika": []
   }
 }

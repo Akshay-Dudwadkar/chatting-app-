@@ -3,22 +3,11 @@
     "username": "owner",
     "password": "owner123",
     "isOwner": true,
-    "lastSeen": "2026-08-24T17:55:58.142Z"
+    "lastSeen": "2026-08-24T17:58:43.500Z"
   },
   {
     "username": "Rasika",
     "password": "9769566943",
-    "isOwner": false
-  },
-  {
-    "username": "akshay",
-    "password": "123456789",
-    "isOwner": false,
-    "lastSeen": "2026-08-24T14:26:38.689Z"
-  },
-  {
-    "username": "akshay21",
-    "password": "akshay123",
     "isOwner": false
   }
 ]
