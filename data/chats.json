@@ -37,7 +37,34 @@
       }
     ],
     "bob": [],
-    "akshay": [],
+    "akshay": [
+      {
+        "id": "9e438587-d842-4f07-827c-77979d5eb496",
+        "from": "owner",
+        "type": "text",
+        "text": "b'",
+        "url": null,
+        "filename": null,
+        "mime": null,
+        "timestamp": "2026-08-24T17:22:15.020Z",
+        "unread": true,
+        "reply_to": null,
+        "replyTo": null
+      },
+      {
+        "id": "ef691b66-80c8-4eb2-92e6-270af8905154",
+        "from": "owner",
+        "type": "image",
+        "text": "",
+        "url": "/uploads/1787593484798-b51e1e97-f041-4563-b428-5aaed6c72ec2-WhatsApp Image 2026-03-31 at 8.57.51 PM.jpeg",
+        "filename": "WhatsApp Image 2026-03-31 at 8.57.51 PM.jpeg",
+        "mime": "image/jpeg",
+        "timestamp": "2026-08-24T17:44:44.810Z",
+        "unread": true,
+        "reply_to": null,
+        "replyTo": null
+      }
+    ],
     "akshay21": [
       {
         "id": "63726a5a-84b7-473d-837f-0c5da1280433",
@@ -59,79 +86,6 @@
         "unread": false
       }
     ],
-    "Rasika": [
-      {
-        "id": "e5c91919-6036-4c25-ba36-b78c8635eb87",
-        "from": "owner",
-        "type": "text",
-        "text": "hey",
-        "url": null,
-        "filename": null,
-        "mime": null,
-        "timestamp": "2026-07-28T07:55:17.579Z",
-        "unread": false
-      },
-      {
-        "id": "1095ca99-5700-4a76-8002-527e13417bce",
-        "from": "Rasika",
-        "type": "deleted",
-        "text": "Message was deleted",
-        "url": null,
-        "filename": null,
-        "mime": null,
-        "timestamp": "2026-07-28T07:56:54.015Z",
-        "unread": false
-      },
-      {
-        "id": "136300c1-9686-44e4-8da3-f6b1d4d2bd02",
-        "from": "Rasika",
-        "type": "deleted",
-        "text": "Message was deleted",
-        "url": null,
-        "filename": null,
-        "mime": null,
-        "timestamp": "2026-07-28T07:59:44.524Z",
-        "unread": false
-      },
-      {
-        "id": "23232ba3-3113-4e6a-96fd-b34788d6c48e",
-        "from": "owner",
-        "type": "text",
-        "text": "hiiii",
-        "url": null,
-        "filename": null,
-        "mime": null,
-        "timestamp": "2026-07-28T08:21:49.700Z",
-        "unread": false
-      },
-      {
-        "id": "900b138f-a87d-47cc-98f8-d08f3b38f773",
-        "from": "Rasika",
-        "type": "text",
-        "text": "hii",
-        "url": null,
-        "filename": null,
-        "mime": null,
-        "timestamp": "2026-07-28T08:58:55.028Z",
-        "unread": false,
-        "hiddenFrom": [
-          "Rasika"
-        ]
-      },
-      {
-        "id": "54c3673f-7989-42be-901f-e7ec1652d8b7",
-        "from": "Rasika",
-        "type": "text",
-        "text": "ji",
-        "url": null,
-        "filename": null,
-        "mime": null,
-        "timestamp": "2026-07-28T09:01:03.062Z",
-        "unread": false,
-        "hiddenFrom": [
-          "Rasika"
-        ]
-      }
-    ]
+    "Rasika": []
   }
 }

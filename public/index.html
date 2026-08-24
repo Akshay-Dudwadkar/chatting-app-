@@ -124,7 +124,7 @@
               <button type="button" id="search-btn" class="icon-btn" title="Search Messages" aria-label="Search">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               </button>
-              <button type="button" id="call-btn" class="icon-btn" title="Voice Call" aria-label="Call">
+              <button type="button" id="call-btn" class="icon-btn" title="Video Call" aria-label="Start video call">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
               </button>
               <button type="button" id="notify-btn" class="icon-btn" title="Notify" aria-label="Notify">
@@ -172,6 +172,20 @@
             </form>
           </div>
         </main>
+      </div>
+    </div>
+
+    <div id="video-call-overlay" class="video-call-overlay hidden" aria-live="polite">
+      <div class="video-call-header">
+        <strong id="video-call-title">Video call</strong>
+        <span id="video-call-status">Connecting...</span>
+      </div>
+      <video id="remote-video" class="remote-video" autoplay playsinline></video>
+      <video id="local-video" class="local-video" autoplay muted playsinline></video>
+      <div class="video-call-controls">
+        <button type="button" id="toggle-mic-btn" class="call-control" title="Mute microphone" aria-label="Mute microphone">🎙</button>
+        <button type="button" id="toggle-camera-btn" class="call-control" title="Turn camera off" aria-label="Turn camera off">▣</button>
+        <button type="button" id="end-call-btn" class="call-control end-call" title="End call" aria-label="End call">☎</button>
       </div>
     </div>
 

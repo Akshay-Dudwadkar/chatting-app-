@@ -509,12 +509,15 @@ app.get('/chat/:username', requireAuth, async (req, res) => {
   }
 
   const chat = await getChatForUser(chatOwner);
+  const readIds = [];
 
   if (current.isOwner) {
     let updated = false;
     chat.forEach((message) => {
-      if (message.from === partner && message.unread) {
+      if (message.from === partner && message.status !== 'read') {
         message.unread = false;
+        message.status = 'read';
+        readIds.push(message.id);
         updated = true;
       }
     });
@@ -522,12 +525,18 @@ app.get('/chat/:username', requireAuth, async (req, res) => {
   } else {
     let updated = false;
     chat.forEach((message) => {
-      if (message.from === 'owner' && message.unread) {
+      if (message.from === 'owner' && message.status !== 'read') {
         message.unread = false;
+        message.status = 'read';
+        readIds.push(message.id);
         updated = true;
       }
     });
     if (updated) await saveChatForUser(chatOwner, chat);
+  }
+
+  if (readIds.length > 0) {
+    io.to(roomName(chatOwner)).emit('messagesRead', { messageIds: readIds });
   }
 
   res.json({ chat });
@@ -541,14 +550,17 @@ app.get('/chat-partners', requireAuth, async (req, res) => {
     for (const user of users) {
       const chat = await getChatForUser(user.username);
       const unreadCount = chat.filter((message) => message.from === user.username && message.unread).length;
-      partners.push({ username: user.username, unreadCount });
+      const presence = onlineUsers.get(user.username);
+      partners.push({ username: user.username, unreadCount, online: Boolean(presence), lastSeen: user.lastSeen || null });
     }
     return res.json({ partners });
   }
 
   const chat = await getChatForUser(current.username);
   const unreadCount = chat.filter((message) => message.from === 'owner' && message.unread).length;
-  res.json({ partners: [{ username: 'owner', unreadCount }] });
+  const owner = await findUser('owner');
+  const presence = onlineUsers.get('owner');
+  res.json({ partners: [{ username: 'owner', unreadCount, online: Boolean(presence), lastSeen: owner?.lastSeen || null }] });
 });
 
 app.delete('/chat/:username', requireAuth, async (req, res) => {
@@ -728,22 +740,29 @@ io.on('connection', async (socket) => {
 
   socket.on('disconnect', async () => {
     onlineUsers.delete(username);
+    const disconnectedAt = new Date().toISOString();
+    user.lastSeen = disconnectedAt;
+    await upsertUser(user);
     if (isOwner) {
       try {
         const allUsers = await getAllUsers();
         for (const u of allUsers) {
-          io.to(roomName(u.username)).emit('userOffline', { username });
+          io.to(roomName(u.username)).emit('userOffline', { username, lastSeen: disconnectedAt });
         }
       } catch (err) {
         console.error('Error emitting owner offline to rooms:', err);
       }
     } else if (room) {
-      io.to(room).emit('userOffline', { username });
+      io.to(room).emit('userOffline', { username, lastSeen: disconnectedAt });
     }
   });
 
   socket.on('message', async (data) => {
     const now = new Date().toISOString();
+    const chat = await getChatForUser(partner);
+    const repliedMessage = data.reply_to
+      ? chat.find((item) => item.id === data.reply_to)
+      : null;
     const message = {
       id: uuidv4(),
       from: username,
@@ -753,9 +772,15 @@ io.on('connection', async (socket) => {
       filename: data.filename || null,
       mime: data.mime || null,
       timestamp: now,
-      unread: true
+      unread: true,
+      reply_to: data.reply_to || null,
+      replyTo: repliedMessage ? {
+        from: repliedMessage.from,
+        text: repliedMessage.text || '',
+        type: repliedMessage.type,
+        filename: repliedMessage.filename || null
+      } : null
     };
-    const chat = await getChatForUser(partner);
     chat.push(message);
     await saveChatForUser(partner, chat);
     io.to(room).emit('message', message);
@@ -776,6 +801,21 @@ io.on('connection', async (socket) => {
     }
   });
 
+  socket.on('markRead', async () => {
+    const chat = await getChatForUser(partner);
+    const readIds = [];
+    chat.forEach((message) => {
+      if (message.from !== username && message.unread) {
+        message.unread = false;
+        message.status = 'read';
+        readIds.push(message.id);
+      }
+    });
+    if (readIds.length === 0) return;
+    await saveChatForUser(partner, chat);
+    io.to(room).emit('messagesRead', { messageIds: readIds });
+  });
+
   socket.on('webrtc-offer', (payload) => {
     socket.to(room).emit('webrtc-offer', payload);
   });
@@ -786,6 +826,10 @@ io.on('connection', async (socket) => {
 
   socket.on('webrtc-ice-candidate', (payload) => {
     socket.to(room).emit('webrtc-ice-candidate', payload);
+  });
+
+  socket.on('call-ended', () => {
+    socket.to(room).emit('call-ended');
   });
 
   socket.on('typing', () => {

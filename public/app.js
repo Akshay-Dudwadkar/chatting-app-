@@ -15,6 +15,14 @@ const messageForm = document.getElementById('message-form');
 const messageInput = document.getElementById('message-input');
 const fileInput = document.getElementById('file-input');
 const callBtn = document.getElementById('call-btn');
+const videoCallOverlay = document.getElementById('video-call-overlay');
+const videoCallTitle = document.getElementById('video-call-title');
+const videoCallStatus = document.getElementById('video-call-status');
+const remoteVideo = document.getElementById('remote-video');
+const localVideo = document.getElementById('local-video');
+const toggleMicBtn = document.getElementById('toggle-mic-btn');
+const toggleCameraBtn = document.getElementById('toggle-camera-btn');
+const endCallBtn = document.getElementById('end-call-btn');
 const voiceRecordBtn = document.getElementById('voice-record-btn');
 const createUserModal = document.getElementById('create-user-modal');
 const manageUsersModal = document.getElementById('manage-users-modal');
@@ -157,7 +165,24 @@ let pinnedMessageIds = new Set();
 let replyTo = null;
 let pendingFile = null;
 let emojiPickerEl = null;
+let peerConnection = null;
+let localStream = null;
+let remoteStream = null;
+let isVideoCallClosing = false;
+const partnerPresence = new Map();
 const INVITE_MESSAGE = "You're invited to join us for an educational session. If you're available, please come online and be a part of this learning opportunity. We look forward to your participation.";
+
+const formatLastSeen = (lastSeen) => {
+  if (!lastSeen) return 'Offline';
+  const date = new Date(lastSeen);
+  if (Number.isNaN(date.getTime())) return 'Offline';
+  return `Last seen ${date.toLocaleDateString([], { month: 'short', day: 'numeric' })} at ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+};
+
+const getPartnerStatus = (username) => {
+  const presence = partnerPresence.get(username);
+  return presence?.online ? 'Online' : formatLastSeen(presence?.lastSeen);
+};
 
 const insertDateSeparatorIfNeeded = (timestamp) => {
   try {
@@ -207,6 +232,8 @@ const showMessageContextMenu = (x, y, message, messageDiv) => {
   replyBtn.addEventListener('click', () => {
     replyTo = message; showReplyPreview(message); menu.remove();
   });
+  const reactionBtn = document.createElement('button'); reactionBtn.textContent = 'React';
+  reactionBtn.addEventListener('click', () => { showReactionPicker(message.id); menu.remove(); });
   const starBtn = document.createElement('button'); starBtn.textContent = pinnedMessageIds.has(message.id) ? 'Unstar' : 'Star';
   starBtn.addEventListener('click', () => { togglePinMessage(message.id); menu.remove(); });
   const delBtn = document.createElement('button'); delBtn.textContent = 'Delete';
@@ -217,7 +244,7 @@ const showMessageContextMenu = (x, y, message, messageDiv) => {
     await deleteMessage(message.id, true);
     menu.remove();
   });
-  menu.appendChild(copyBtn); menu.appendChild(replyBtn); menu.appendChild(starBtn); menu.appendChild(delBtn); menu.appendChild(delEveryoneBtn);
+  menu.appendChild(copyBtn); menu.appendChild(replyBtn); menu.appendChild(reactionBtn); menu.appendChild(starBtn); menu.appendChild(delBtn); menu.appendChild(delEveryoneBtn);
   document.body.appendChild(menu);
   menu.style.left = `${x}px`;
   menu.style.top = `${y}px`;
@@ -316,7 +343,7 @@ const clearMessages = () => {
   `;
 };
 
-const createSidebarItem = ({ username, label, unreadCount = 0, hasActions = false }) => {
+const createSidebarItem = ({ username, label, unreadCount = 0, hasActions = false, online, lastSeen }) => {
   const item = document.createElement('div');
   item.className = 'user-item';
   item.dataset.username = username;
@@ -324,7 +351,7 @@ const createSidebarItem = ({ username, label, unreadCount = 0, hasActions = fals
     <div class="user-avatar">${username.charAt(0).toUpperCase()}</div>
     <div class="user-info">
       <h4>${username === 'owner' ? 'Owner' : username}</h4>
-      <p>${label}</p>
+      <p>${online ? 'Online' : (lastSeen ? formatLastSeen(lastSeen) : label)}</p>
     </div>
     ${unreadCount > 0 ? `<span class="badge">${unreadCount}</span>` : ''}
     ${hasActions ? `<button class="action-btn" title="Actions">⋯</button>` : ''}
@@ -363,10 +390,13 @@ const renderSidebar = async () => {
 
     if (currentUser.isOwner) {
       data.partners.forEach((partner) => {
+        partnerPresence.set(partner.username, { online: partner.online, lastSeen: partner.lastSeen });
         const item = createSidebarItem({
           username: partner.username,
           label: 'Click to manage',
           unreadCount: partner.unreadCount,
+          online: partner.online,
+          lastSeen: partner.lastSeen,
           hasActions: true
         });
         userList.appendChild(item);
@@ -381,10 +411,13 @@ const renderSidebar = async () => {
       }
     } else {
       const partner = data.partners[0];
+      partnerPresence.set(partner.username, { online: partner.online, lastSeen: partner.lastSeen });
       const item = createSidebarItem({
         username: partner.username,
         label: 'Chat with owner',
         unreadCount: partner.unreadCount,
+        online: partner.online,
+        lastSeen: partner.lastSeen,
         hasActions: false
       });
       userList.appendChild(item);
@@ -404,7 +437,7 @@ const selectPartner = async (username) => {
   setActiveSidebarItem();
   showElement(chatMain); // Show chat area when partner is selected
   chatPartnerName.textContent = username === 'owner' ? 'Owner' : username;
-  chatStatus.textContent = 'Online';
+  chatStatus.textContent = getPartnerStatus(username);
   chatAvatarLetter.textContent = username.charAt(0).toUpperCase();
   messagesContainer.innerHTML = '';
   await loadChat(username);
@@ -463,6 +496,26 @@ const renderMessage = (message) => {
   const bubble = document.createElement('div');
   bubble.className = `message-bubble${isAnnouncement ? ' announcement-bubble' : ''}`;
 
+  if (message.replyTo) {
+    const replyQuote = document.createElement('div');
+    replyQuote.className = 'message-reply-quote';
+    replyQuote.title = 'Show replied message';
+    const replyAuthor = document.createElement('strong');
+    replyAuthor.textContent = `Replying to ${message.replyTo.from}`;
+    const replyText = document.createElement('span');
+    replyText.textContent = message.replyTo.text || message.replyTo.filename || 'Attachment';
+    replyQuote.appendChild(replyAuthor);
+    replyQuote.appendChild(replyText);
+    replyQuote.addEventListener('click', () => {
+      const original = messagesContainer.querySelector(`[data-message-id="${message.reply_to}"]`);
+      if (!original) return;
+      original.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      original.classList.add('message-reply-target');
+      setTimeout(() => original.classList.remove('message-reply-target'), 1400);
+    });
+    bubble.appendChild(replyQuote);
+  }
+
   if (message.type === 'deleted') {
     bubble.textContent = 'Message was deleted';
     bubble.classList.add('deleted-message');
@@ -490,40 +543,18 @@ const renderMessage = (message) => {
     bubble.style.opacity = '0.8';
   }
 
-  if (message.type !== 'deleted') {
-    const deleteButton = document.createElement('button');
-    deleteButton.className = 'message-delete-btn';
-    deleteButton.title = 'Delete this message';
-    deleteButton.textContent = '🗑️';
-    deleteButton.addEventListener('click', async () => {
-      if (!confirm('Delete this message?')) return;
-        await deleteMessage(message.id, false);
-    });
-    bubble.appendChild(deleteButton);
-
-    const pinButton = document.createElement('button');
-    pinButton.className = 'message-pin-btn pin-btn';
-    pinButton.title = pinnedMessageIds.has(message.id) ? 'Unpin message' : 'Pin message';
-    pinButton.textContent = pinnedMessageIds.has(message.id) ? '📌' : '📍';
-    pinButton.addEventListener('click', () => togglePinMessage(message.id));
-    bubble.appendChild(pinButton);
-
-    const reactionButton = document.createElement('button');
-    reactionButton.className = 'message-reaction-btn';
-    reactionButton.title = 'Add reaction';
-    reactionButton.textContent = '😊';
-    reactionButton.addEventListener('click', () => showReactionPicker(message.id));
-    bubble.appendChild(reactionButton);
-    const replyButton = document.createElement('button');
-    replyButton.className = 'message-reply-btn';
-    replyButton.title = 'Reply';
-    replyButton.textContent = '↩️';
-    replyButton.addEventListener('click', () => {
-      replyTo = message;
-      showReplyPreview(message);
-    });
-    bubble.appendChild(replyButton);
-  }
+  const messageMenuButton = document.createElement('button');
+  messageMenuButton.type = 'button';
+  messageMenuButton.className = 'message-menu-button';
+  messageMenuButton.title = 'Message options';
+  messageMenuButton.setAttribute('aria-label', 'Open message options');
+  messageMenuButton.textContent = '⋯';
+  messageMenuButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const rect = messageMenuButton.getBoundingClientRect();
+    showMessageContextMenu(rect.right - 170, rect.bottom + 4, message, messageDiv);
+  });
+  bubble.appendChild(messageMenuButton);
 
   const reactionsDiv = document.createElement('div');
   reactionsDiv.className = 'message-reactions';
@@ -543,17 +574,11 @@ const renderMessage = (message) => {
   // delivery/read status for sent messages
   if (message.from === currentUser.username) {
     const statusEl = document.createElement('span');
-    const status = message.status || 'sent'; // possible: sent, delivered, read
+    const status = message.status === 'read' ? 'read' : 'sent';
     statusEl.className = `message-status ${status}`;
-    let svg = '';
-    if (status === 'sent') {
-      svg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
-    } else if (status === 'delivered') {
-      svg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/><polyline points="22 6 11 17 6 12"/></svg>';
-    } else if (status === 'read') {
-      svg = '<svg viewBox="0 0 24 24" fill="none" stroke="#34B7F1" stroke-width="2"><polyline points="20 6 9 17 4 12"/><polyline points="22 6 11 17 6 12"/></svg>';
-    }
-    statusEl.innerHTML = svg;
+    statusEl.innerHTML = status === 'read'
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="#34B7F1" stroke-width="2"><polyline points="20 6 9 17 4 12"/><polyline points="22 6 11 17 6 12"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
     bubble.appendChild(statusEl);
   }
 
@@ -645,7 +670,19 @@ const loadChat = async (username) => {
     } else {
       // render messages with date separators
       let lastDateKey = null;
+      const messagesById = new Map(data.chat.map((msg) => [msg.id, msg]));
       data.chat.forEach((msg) => {
+        if (!msg.replyTo && msg.reply_to) {
+          const original = messagesById.get(msg.reply_to);
+          if (original) {
+            msg.replyTo = {
+              from: original.from,
+              text: original.text || '',
+              type: original.type,
+              filename: original.filename || null
+            };
+          }
+        }
         const msgDateKey = new Date(msg.timestamp).toDateString();
         if (msgDateKey !== lastDateKey) {
           const sep = document.createElement('div');
@@ -670,6 +707,64 @@ const loadChat = async (username) => {
 
 const getSocketPartner = () => (currentUser.isOwner ? selectedPartner : currentUser.username);
 
+const closeVideoCall = (notifyPeer = true) => {
+  if (notifyPeer && socket) socket.emit('call-ended');
+  if (peerConnection) peerConnection.close();
+  if (localStream) localStream.getTracks().forEach((track) => track.stop());
+  if (remoteStream) remoteStream.getTracks().forEach((track) => track.stop());
+  peerConnection = null;
+  localStream = null;
+  remoteStream = null;
+  remoteVideo.srcObject = null;
+  localVideo.srcObject = null;
+  hideElement(videoCallOverlay);
+  isVideoCallClosing = false;
+};
+
+const createPeerConnection = () => {
+  const connection = new RTCPeerConnection({
+    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+  });
+  remoteStream = new MediaStream();
+  remoteVideo.srcObject = remoteStream;
+  connection.ontrack = (event) => event.streams[0].getTracks().forEach((track) => remoteStream.addTrack(track));
+  connection.onicecandidate = (event) => {
+    if (event.candidate && socket) socket.emit('webrtc-ice-candidate', event.candidate);
+  };
+  connection.onconnectionstatechange = () => {
+    if (connection.connectionState === 'connected') videoCallStatus.textContent = 'Connected';
+    if (['failed', 'disconnected'].includes(connection.connectionState)) closeVideoCall(false);
+  };
+  return connection;
+};
+
+const startVideoCall = async (incomingOffer = null) => {
+  if (!socket || !selectedPartner || peerConnection) return;
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    localVideo.srcObject = localStream;
+    showElement(videoCallOverlay);
+    videoCallTitle.textContent = `Video call with ${selectedPartner}`;
+    videoCallStatus.textContent = incomingOffer ? 'Answering...' : 'Calling...';
+    peerConnection = createPeerConnection();
+    localStream.getTracks().forEach((track) => peerConnection.addTrack(track, localStream));
+    if (incomingOffer) {
+      await peerConnection.setRemoteDescription(incomingOffer);
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+      socket.emit('webrtc-answer', answer);
+    } else {
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      socket.emit('webrtc-offer', offer);
+    }
+  } catch (error) {
+    console.error('Video call failed:', error);
+    closeVideoCall(false);
+    alert('Camera and microphone access is required for video calls.');
+  }
+};
+
 const connectSocket = () => {
   if (!currentUser || !selectedPartner) return;
 
@@ -690,6 +785,19 @@ const connectSocket = () => {
     console.error('Socket connection failed:', error);
   });
 
+  socket.on('connect', () => {
+    socket.emit('markRead');
+  });
+
+  socket.on('webrtc-offer', (offer) => startVideoCall(offer));
+  socket.on('webrtc-answer', async (answer) => {
+    if (peerConnection) await peerConnection.setRemoteDescription(answer);
+  });
+  socket.on('webrtc-ice-candidate', async (candidate) => {
+    if (peerConnection) await peerConnection.addIceCandidate(candidate);
+  });
+  socket.on('call-ended', () => closeVideoCall(false));
+
   socket.on('unreadSummary', (data) => {
     // data.partners = [{ username, unreadCount }]
     console.log('unreadSummary received', data);
@@ -700,7 +808,17 @@ const connectSocket = () => {
   socket.on('message', (message) => {
     insertDateSeparatorIfNeeded(message.timestamp);
     renderMessage(message);
+    if (message.from !== currentUser.username) socket.emit('markRead');
     renderSidebar();
+  });
+
+  socket.on('messagesRead', ({ messageIds = [] }) => {
+    messageIds.forEach((messageId) => {
+      const statusEl = messagesContainer.querySelector(`[data-message-id="${messageId}"] .message-status`);
+      if (!statusEl) return;
+      statusEl.className = 'message-status read';
+      statusEl.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#34B7F1" stroke-width="2"><polyline points="20 6 9 17 4 12"/><polyline points="22 6 11 17 6 12"/></svg>';
+    });
   });
 
   socket.on('messageDeleted', (payload) => {
@@ -737,12 +855,14 @@ const connectSocket = () => {
 
   socket.on('userOnline', ({ username }) => {
     if (username !== currentUser.username) {
+      partnerPresence.set(username, { online: true, lastSeen: null });
       updateUserStatus(username, 'Online');
     }
   });
 
-  socket.on('userOffline', ({ username }) => {
+  socket.on('userOffline', ({ username, lastSeen }) => {
     if (username !== currentUser.username) {
+      partnerPresence.set(username, { online: false, lastSeen });
       updateUserStatus(username, 'Offline');
     }
   });
@@ -767,7 +887,7 @@ const hideTypingIndicator = () => {
 
 const updateUserStatus = (username, status) => {
   if (selectedPartner === username) {
-    chatStatus.textContent = status;
+    chatStatus.textContent = status === 'Offline' ? getPartnerStatus(username) : status;
   }
 };
 
@@ -1042,11 +1162,29 @@ fileInput.addEventListener('change', (event) => {
   }
 });
 
-callBtn.addEventListener('click', (event) => {
+callBtn.addEventListener('click', async (event) => {
   event.preventDefault();
   event.stopPropagation();
-  alert('Voice call feature is not available in this version.');
+  await startVideoCall();
 });
+
+toggleMicBtn.addEventListener('click', () => {
+  const track = localStream?.getAudioTracks()[0];
+  if (!track) return;
+  track.enabled = !track.enabled;
+  toggleMicBtn.textContent = track.enabled ? '🎙' : '🔇';
+  toggleMicBtn.title = track.enabled ? 'Mute microphone' : 'Unmute microphone';
+});
+
+toggleCameraBtn.addEventListener('click', () => {
+  const track = localStream?.getVideoTracks()[0];
+  if (!track) return;
+  track.enabled = !track.enabled;
+  toggleCameraBtn.textContent = track.enabled ? '▣' : '□';
+  toggleCameraBtn.title = track.enabled ? 'Turn camera off' : 'Turn camera on';
+});
+
+endCallBtn.addEventListener('click', () => closeVideoCall());
 
 voiceRecordBtn.addEventListener('click', () => {
   if (mediaRecorder && mediaRecorder.state !== 'inactive') {

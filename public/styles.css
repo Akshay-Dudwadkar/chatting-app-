@@ -92,7 +92,6 @@ body.wa-theme .message.received .message-bubble {
 }
 .message-status svg { width: 14px; height: 14px; }
 .message-status.sent { color: var(--text-tertiary); }
-.message-status.delivered { color: var(--text-secondary); }
 .message-status.read { color: #34B7F1; } /* blue tick */
 
 /* Tweak input area to mimic WhatsApp */
@@ -710,6 +709,71 @@ body.dark-mode .welcome-message {
   word-wrap: break-word; position: relative;
   box-shadow: var(--shadow-sm);
 }
+.message-reply-quote {
+  display: flex; flex-direction: column; gap: 2px;
+  margin: -0.15rem 0 0.5rem; padding: 0.35rem 0.55rem;
+  border-left: 3px solid var(--accent);
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  font-size: 0.76rem;
+  max-width: 100%;
+  cursor: pointer;
+}
+.message-reply-quote strong { color: var(--accent); }
+.message-reply-quote span {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  opacity: 0.8;
+}
+.message-reply-target .message-bubble {
+  animation: replyTarget 1.4s ease;
+}
+
+.video-call-overlay {
+  position: fixed; inset: 0; z-index: 3000;
+  background: #101010; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.video-call-header {
+  position: absolute; top: 1.25rem; left: 1.5rem; z-index: 2;
+  display: flex; flex-direction: column; gap: 0.2rem;
+}
+.video-call-status { color: rgba(255,255,255,0.7); font-size: 0.85rem; }
+.remote-video { width: 100%; height: 100%; object-fit: contain; }
+.local-video {
+  position: absolute; right: 1.25rem; bottom: 6rem;
+  width: min(25vw, 240px); aspect-ratio: 3 / 4;
+  object-fit: cover; border: 2px solid #fff; border-radius: 8px;
+  background: #252525;
+}
+.video-call-controls {
+  position: absolute; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 0.75rem;
+}
+.call-control {
+  width: 46px; height: 46px; border: 0; border-radius: 50%; cursor: pointer;
+  background: rgba(255,255,255,0.18); color: #fff; font-size: 1.1rem;
+}
+.call-control.end-call { background: #d93b4f; }
+.call-control:hover { background: rgba(255,255,255,0.3); }
+.message-menu-button {
+  display: block;
+  margin: 0 0 -0.35rem auto;
+  padding: 0 0.15rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  opacity: 0.65;
+}
+.message-menu-button:hover,
+.message-menu-button:focus-visible { opacity: 1; }
+@keyframes replyTarget {
+  0%, 100% { box-shadow: var(--shadow-sm); }
+  35% { box-shadow: 0 0 0 3px var(--accent); }
+}
 .message.sent .message-bubble {
   background: var(--msg-sent);
   color: var(--msg-sent-text);
@@ -743,19 +807,6 @@ body.dark-mode .welcome-message {
   margin-top: 3px; padding: 0 0.5rem;
 }
 .deleted-message { opacity: 0.5; font-style: italic; }
-
-/* message action buttons */
-.message-delete-btn, .message-pin-btn, .message-reaction-btn {
-  background: none; border: none;
-  cursor: pointer; font-size: 0.85rem;
-  opacity: 0; transition: opacity var(--transition);
-  padding: 2px 3px; margin-left: 2px;
-}
-.message-bubble:hover .message-delete-btn,
-.message-bubble:hover .message-pin-btn,
-.message-bubble:hover .message-reaction-btn { opacity: 0.7; }
-.message-delete-btn:hover, .message-pin-btn:hover,
-.message-reaction-btn:hover { opacity: 1 !important; }
 
 /* Reactions */
 .message-reactions {

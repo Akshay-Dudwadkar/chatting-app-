@@ -2,7 +2,8 @@
   {
     "username": "owner",
     "password": "owner123",
-    "isOwner": true
+    "isOwner": true,
+    "lastSeen": "2026-08-24T17:55:58.142Z"
   },
   {
     "username": "Rasika",
@@ -11,8 +12,9 @@
   },
   {
     "username": "akshay",
-    "password": "akshay123",
-    "isOwner": false
+    "password": "123456789",
+    "isOwner": false,
+    "lastSeen": "2026-08-24T14:26:38.689Z"
   },
   {
     "username": "akshay21",
