@@ -38,7 +38,7 @@ A responsive chat application with owner-managed users, real-time messaging, fil
    ```
 
 ## Default accounts
-- Owner: `owner` / `owner123`
+- 
 - User: `alice` / `alice123`
 - User: `bob` / `bob123`
 
